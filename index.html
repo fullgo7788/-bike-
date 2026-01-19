@@ -3,35 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂富自行車-專業體感版</title>
+    <title>樂富自行車 - 極速體感</title>
     <style>
         body { margin: 0; background: #050510; color: #fff; overflow: hidden; font-family: sans-serif; touch-action: none; }
         canvas { display: block; background: radial-gradient(circle, #1a1a2e 0%, #050510 100%); }
         #ui { position: absolute; top: 20px; left: 20px; z-index: 10; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px #000; pointer-events: none; }
-        #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); z-index: 1000; }
+        #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.9); z-index: 1000; }
         .box { background: #16213e; padding: 30px; border-radius: 25px; border: 3px solid #00ff00; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 30px rgba(0,255,0,0.4); }
-        h1 { color: #fdbb2d; margin-bottom: 10px; font-size: 28px; }
-        button { background: #00ff00; border: none; padding: 20px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; box-shadow: 0 6px 0 #008800; -webkit-tap-highlight-color: transparent; }
-        button:active { transform: translateY(4px); box-shadow: none; }
-        .hint { color: #888; font-size: 13px; margin-top: 15px; line-height: 1.5; }
-        #err { color: #ff4757; font-size: 14px; margin-top: 10px; display: none; font-weight: bold; }
+        button { background: #00ff00; border: none; padding: 20px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; box-shadow: 0 6px 0 #008800; }
     </style>
 </head>
 <body>
     <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">3</span></div>
     <div id="menu">
         <div class="box">
-            <h1>樂富自行車</h1>
-            <p style="color:#00ff00; font-weight:bold;">[ 請確認手機非靜音模式 ]</p>
-            <button id="start-btn">點我開始遊戲</button>
-            <div id="err">啟動失敗！請確認使用 HTTPS 開啟網頁</div>
-            <div class="hint">若點擊無反應，請重新整理頁面<br>並確保在彈窗中點選「允許」</div>
+            <h1 style="color:#fdbb2d">樂富自行車</h1>
+            <p>【極速體感優化版】</p>
+            <button id="start-btn">開始挑戰</button>
         </div>
     </div>
     <canvas id="c"></canvas>
 
 <script>
-    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn'), errD=document.getElementById('err');
+    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn');
     let score=0, lives=3, running=false, stars=[], p={x:0, w:110, v:0}, tilt=0, aCtx=null;
 
     function resize(){ cvs.width=window.innerWidth; cvs.height=window.innerHeight; p.x=cvs.width/2-p.w/2; }
@@ -39,96 +33,85 @@
 
     function playNote(f, type='sine', d=0.2, vol=0.1) {
         if(!aCtx) return;
-        try {
-            const o=aCtx.createOscillator(), g=aCtx.createGain();
-            o.type=type; o.frequency.setValueAtTime(f, aCtx.currentTime);
-            g.gain.setValueAtTime(vol, aCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
-            o.connect(g); g.connect(aCtx.destination);
-            o.start(); o.stop(aCtx.currentTime+d);
-        } catch(e){}
+        const o=aCtx.createOscillator(), g=aCtx.createGain();
+        o.type=type; o.frequency.value=f;
+        g.gain.setValueAtTime(vol, aCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
+        o.connect(g); g.connect(aCtx.destination);
+        o.start(); o.stop(aCtx.currentTime+d);
     }
 
     let bStep = 0;
     function playBGM() {
         if(!running) return;
-        const melody = [261, 329, 392, 523];
-        playNote(melody[bStep % 4], 'triangle', 0.5, 0.05);
+        const melody = [261.6, 329.6, 392.0, 523.2];
+        playNote(melody[bStep % 4], 'triangle', 0.5, 0.04);
         bStep++;
-        setTimeout(playBGM, 500);
+        setTimeout(playBGM, 450); // 節奏加快
     }
 
-    // --- 核心啟動邏輯 ---
-    async function init() {
-        try {
-            // 1. 啟動音效環境
-            aCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if(aCtx.state === 'suspended') await aCtx.resume();
-            
-            // 2. 請求感應器權限
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const res = await DeviceOrientationEvent.requestPermission();
-                if (res === 'granted') {
-                    window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
-                } else {
-                    alert("必須授權動作感應器才能遊玩！");
-                    return;
-                }
-            } else {
-                window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
+    // --- 核心優化：極速響應監聽 ---
+    btn.onclick = async () => {
+        aCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const res = await DeviceOrientationEvent.requestPermission();
+            if (res === 'granted') {
+                // 使用最強採樣率
+                window.addEventListener('deviceorientation', e => { 
+                    // 提高傾斜權重至 2.5，微小動作即有反應
+                    tilt = e.gamma * 2.5; 
+                }, true);
+                start();
             }
-
-            // 3. 進入遊戲
-            startActualGame();
-        } catch (e) {
-            errD.style.display = 'block';
-            console.error(e);
+        } else {
+            window.addEventListener('deviceorientation', e => { tilt = e.gamma * 2.5; }, true);
+            start();
         }
+    };
+
+    function start() {
+        running=true; m.style.display='none';
+        score=0; lives=3; stars=[]; p.v=0;
+        playBGM(); spawnLoop(); gameLoop();
     }
 
-    function startActualGame() {
-        score=0; lives=3; stars=[]; running=true;
-        sE.innerText=0; lE.innerText=3;
-        m.style.display='none';
-        playNote(523, 'sine', 0.2, 0.1);
-        playBGM();
-        spawnStars();
-        gameLoop();
-    }
-
-    // 支援點擊與觸摸雙事件
-    btn.onclick = init;
-
-    function spawnStars() {
+    function spawnLoop() {
         if(!running) return;
         stars.push({x:Math.random()*(cvs.width-20), y:-20});
-        setTimeout(spawnStars, 900);
+        setTimeout(spawnLoop, 800);
     }
 
     function gameLoop() {
         if(!running) return;
         ctx.clearRect(0,0,cvs.width,cvs.height);
 
-        p.v += (tilt || 0) * 0.18; p.v *= 0.85; p.x += p.v;
-        p.x = Math.max(0, Math.min(cvs.width-p.w, p.x));
+        // --- 物理優化算法 ---
+        // p.v 是速度，tilt 是加速度。提高係數讓反應更靈敏，降低阻尼讓移動更滑順。
+        p.v += (tilt || 0) * 0.45;  // 加速度係數 (從0.2 -> 0.45)
+        p.v *= 0.82;               // 阻尼 (0.82 讓手感更俐落)
+        p.x += p.v;
+
+        if(p.x < 0) { p.x=0; p.v=0; }
+        if(p.x > cvs.width-p.w) { p.x=cvs.width-p.w; p.v=0; }
         
+        // 畫板
         ctx.fillStyle='#00ff00';
-        ctx.shadowBlur = 15; ctx.shadowColor = '#00ff00';
-        ctx.fillRect(p.x, cvs.height-70, p.w, 18);
+        ctx.shadowBlur = 20; ctx.shadowColor = '#00ff00';
+        ctx.fillRect(p.x, cvs.height-70, p.w, 20);
         ctx.shadowBlur = 0;
 
         for(let i=stars.length-1; i>=0; i--) {
-            let s=stars[i]; s.y += 5;
+            let s=stars[i]; s.y += 6; // 下落速度加快
             ctx.fillStyle = '#fdbb2d';
-            ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(s.x, s.y, 13, 0, 7); ctx.fill();
             
-            if(s.y > cvs.height-75 && s.y < cvs.height-55 && s.x > p.x && s.x < p.x+p.w) {
+            if(s.y > cvs.height-80 && s.y < cvs.height-50 && s.x > p.x && s.x < p.x+p.w) {
                 score += 10; sE.innerText=score;
                 playNote(659, 'sine', 0.1, 0.2);
                 stars.splice(i,1);
             } else if(s.y > cvs.height) {
                 lives--; lE.innerText=lives;
-                playNote(110, 'sawtooth', 0.3, 0.3);
+                playNote(150, 'sawtooth', 0.2, 0.3);
                 stars.splice(i,1);
                 if(lives<=0) { running=false; location.reload(); }
             }
