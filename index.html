@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂富自行車 - 極限體感</title>
+    <title>樂富自行車 - 體感挑戰</title>
     <style>
         body { margin: 0; background: #050510; color: #fff; overflow: hidden; font-family: sans-serif; touch-action: none; }
         canvas { display: block; background: radial-gradient(circle, #1a1a2e 0%, #050510 100%); }
@@ -14,20 +14,21 @@
     </style>
 </head>
 <body>
-    <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">3</span></div>
+    <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">10</span></div>
     <div id="menu">
         <div class="box">
             <h1 style="color:#fdbb2d">樂富自行車</h1>
-            <p>【極致靈敏優化版】</p>
+            <p>【專業體感訓練】</p>
             <button id="start-btn">開始挑戰</button>
-            <p style="font-size: 12px; color: #888; margin-top: 15px;">提示：輕微傾斜即可快速移動</p>
+            <p style="font-size: 13px; color: #888; margin-top: 15px;">生命加倍：共有 10 次機會</p>
         </div>
     </div>
     <canvas id="c"></canvas>
 
 <script>
     const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn');
-    let score=0, lives=3, running=false, stars=[], p={x:0, w:120, v:0}, tilt=0, aCtx=null;
+    // 初始化生命為 10
+    let score=0, lives=10, running=false, stars=[], p={x:0, w:120, v:0}, tilt=0, aCtx=null;
 
     function resize(){ cvs.width=window.innerWidth; cvs.height=window.innerHeight; p.x=cvs.width/2-p.w/2; }
     window.onresize=resize; resize();
@@ -57,7 +58,7 @@
             const res = await DeviceOrientationEvent.requestPermission();
             if (res === 'granted') {
                 window.addEventListener('deviceorientation', e => { 
-                    // 極速權重提升至 3.5，讓細微動作也能產生大位移
+                    // 維持 3.5 倍率：極速響應
                     tilt = e.gamma * 3.5; 
                 }, true);
                 start();
@@ -70,15 +71,15 @@
 
     function start() {
         running=true; m.style.display='none';
-        score=0; lives=3; stars=[]; p.v=0; p.x=cvs.width/2-p.w/2;
+        score=0; lives=10; stars=[]; p.v=0; p.x=cvs.width/2-p.w/2;
+        sE.innerText=0; lE.innerText=10;
         playBGM(); spawnLoop(); gameLoop();
     }
 
     function spawnLoop() {
         if(!running) return;
         stars.push({x:Math.random()*(cvs.width-20), y:-20});
-        // 增加生成間隔至 1.2 秒 (原本 0.8)
-        setTimeout(spawnLoop, 1200);
+        setTimeout(spawnLoop, 1200); // 慢速生成
     }
 
     function gameLoop() {
@@ -86,14 +87,13 @@
         ctx.clearRect(0,0,cvs.width,cvs.height);
 
         // --- 極速體感算法 ---
-        p.v += (tilt || 0) * 0.8;  // 加速度大幅提升 (0.45 -> 0.8)
-        p.v *= 0.75;               // 降低阻尼感 (0.82 -> 0.75)，讓停下來更乾脆
+        p.v += (tilt || 0) * 0.8; 
+        p.v *= 0.75; 
         p.x += p.v;
 
         if(p.x < 0) { p.x=0; p.v=0; }
         if(p.x > cvs.width-p.w) { p.x=cvs.width-p.w; p.v=0; }
         
-        // 畫板 (加寬至 120)
         ctx.fillStyle='#00ff00';
         ctx.shadowBlur = 20; ctx.shadowColor = '#00ff00';
         ctx.fillRect(p.x, cvs.height-70, p.w, 20);
@@ -101,7 +101,7 @@
 
         for(let i=stars.length-1; i>=0; i--) {
             let s=stars[i]; 
-            s.y += 3.5; // 下落速度顯著減慢 (6 -> 3.5)
+            s.y += 3.5; // 維持慢速下落
             
             ctx.fillStyle = '#fdbb2d';
             ctx.beginPath(); ctx.arc(s.x, s.y, 13, 0, 7); ctx.fill();
