@@ -3,164 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂富單車 - 第一人稱極速跑酷</title>
+    <title>樂富衝鋒 - 單車戰地</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: sans-serif; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 100; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 4px #000; }
-        #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.85); z-index: 1000; }
-        .box { background: #1a1a2e; padding: 30px; border-radius: 25px; border: 3px solid #00ff00; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 30px rgba(0,255,0,0.5); }
-        button { background: #00ff00; border: none; padding: 20px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; margin-top: 15px; box-shadow: 0 6px 0 #008800; }
-        .handlebar { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 500px; pointer-events: none; z-index: 50; filter: drop-shadow(0 0 10px #00ff00); }
-    </style>
-</head>
-<body>
-    <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">10</span></div>
-    
-    <svg class="handlebar" viewBox="0 0 500 200" id="bike-ui">
-        <path d="M50,180 Q100,50 250,50 Q400,50 450,180" fill="none" stroke="#333" stroke-width="20"/>
-        <path d="M50,180 Q100,50 250,50 Q400,50 450,180" fill="none" stroke="#00ff00" stroke-width="2" opacity="0.5"/>
-        <rect x="210" y="40" width="80" height="30" rx="5" fill="#222" />
-        <text x="250" y="60" fill="#00ff00" font-size="12" text-anchor="middle" font-family="monospace">LEFU BIKE</text>
-    </svg>
+        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: 'Press Start 2P', cursive, sans-serif; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* 引入像素字體 */
 
-    <div id="menu">
-        <div class="box">
-            <h1 style="color:#fdbb2d">樂富單車</h1>
-            <p>第一人稱跑酷挑戰</p>
-            <button id="start-btn">開始騎行</button>
-            <p style="font-size: 13px; color: #888;">傾斜手機控制方向</p>
-        </div>
-    </div>
+        canvas { display: block; image-rendering: pixelated; } /* 像素化渲染，增加 CS 感覺 */
+        
+        /* 介面元素 */
+        #ui-container { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
+        #top-left-hp { position: absolute; top: 15px; left: 15px; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 0px #000; color: #fff; }
+        #top-right-score { position: absolute; top: 15px; right: 15px; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 0px #000; color: #00ff00; }
+        #bottom-right-ammo { position: absolute; bottom: 20px; right: 20px; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 0px #000; color: #add8e6; } /* 淡藍色子彈 */
+        #bottom-left-message { position: absolute; bottom: 20px; left: 20px; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 0px #000; color: #fff; }
 
-    <canvas id="c"></canvas>
-
-<script>
-    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn'), bikeUI=document.getElementById('bike-ui');
-    
-    let score=0, lives=10, running=false, stars=[], tilt=0, aCtx=null, horizonY, playerX=0;
-
-    function resize(){ 
-        cvs.width=window.innerWidth; 
-        cvs.height=window.innerHeight; 
-        horizonY = cvs.height * 0.45;
-        playerX = cvs.width / 2;
-    }
-    window.onresize=resize; resize();
-
-    function playNote(f, type='sine', d=0.2, vol=0.1) {
-        if(!aCtx) return;
-        const o=aCtx.createOscillator(), g=aCtx.createGain();
-        o.type=type; o.frequency.value=f;
-        g.gain.setValueAtTime(vol, aCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
-        o.connect(g); g.connect(aCtx.destination);
-        o.start(); o.stop(aCtx.currentTime+d);
-    }
-
-    function playBGM() {
-        if(!running) return;
-        const melody = [130.8, 164.8, 196, 261.6];
-        playNote(melody[Math.floor(Date.now()/500)%4], 'triangle', 0.5, 0.03);
-        setTimeout(playBGM, 500);
-    }
-
-    btn.onclick = async () => {
-        aCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const res = await DeviceOrientationEvent.requestPermission();
-            if (res === 'granted') {
-                window.addEventListener('deviceorientation', e => { tilt = e.gamma * 3.5; }, true);
-                start();
-            }
-        } else {
-            window.addEventListener('deviceorientation', e => { tilt = e.gamma * 3.5; }, true);
-            start();
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 30px; height: 30px;
+            border: 1px solid rgba(0,255,0,0.8);
+            box-shadow: 0 0 5px rgba(0,255,0,0.5);
+            pointer-events: none; z-index: 101;
         }
-    };
-
-    function start() {
-        running=true; m.style.display='none';
-        score=0; lives=10; stars=[]; 
-        sE.innerText=0; lE.innerText=10;
-        playBGM(); spawnLoop(); gameLoop();
-    }
-
-    function spawnLoop() {
-        if(!running) return;
-        // 在地平線上的隨機位置產生星星
-        stars.push({
-            x: Math.random() * 2 - 1, // 相對位置 -1 到 1
-            z: 0, // 距離 (0 到 1)
-            size: 2
-        });
-        setTimeout(spawnLoop, 1000);
-    }
-
-    function gameLoop() {
-        if(!running) return;
-        ctx.fillStyle = '#050510';
-        ctx.fillRect(0, 0, cvs.width, cvs.height);
-
-        // 畫地平線與道路
-        ctx.strokeStyle = '#1a1a4e';
-        ctx.beginPath();
-        ctx.moveTo(0, horizonY);
-        ctx.lineTo(cvs.width, horizonY);
-        ctx.stroke();
-
-        // 玩家左右移動
-        playerX += tilt * 0.5;
-        playerX = Math.max(cvs.width*0.2, Math.min(cvs.width*0.8, playerX));
-
-        // 龍頭跟隨傾斜動畫
-        bikeUI.style.transform = `translateX(-50%) rotate(${tilt*0.5}deg)`;
-
-        // 畫透視道路線
-        ctx.strokeStyle = '#00ff0033';
-        for(let i=-2; i<=2; i++) {
-            ctx.beginPath();
-            ctx.moveTo(cvs.width/2 + i*20, horizonY);
-            ctx.lineTo(cvs.width/2 + i*400 - (playerX - cvs.width/2)*2, cvs.height);
-            ctx.stroke();
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: rgba(0,255,0,0.8);
         }
+        #crosshair::before { width: 100%; height: 2px; top: 50%; transform: translateY(-50%); }
+        #crosshair::after { height: 100%; width: 2px; left: 50%; transform: translateX(-50%); }
 
-        // 處理星星 (從遠到近)
-        for(let i=stars.length-1; i>=0; i--) {
-            let s = stars[i];
-            s.z += 0.015; // 向前飛的速度
 
-            // 計算 3D 透視座標
-            let scale = Math.pow(s.z, 2); 
-            let screenX = cvs.width/2 + (s.x * cvs.width * scale * 1.5) - (playerX - cvs.width/2) * scale;
-            let screenY = horizonY + (cvs.height - horizonY) * scale;
-            let size = 5 + 40 * scale;
-
-            // 畫出星星
-            ctx.fillStyle = '#fdbb2d';
-            ctx.shadowBlur = size; ctx.shadowColor = '#fdbb2d';
-            ctx.beginPath(); ctx.arc(screenX, screenY, size, 0, Math.PI*2); ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // 碰撞檢測 (當 z 接近 0.9 時)
-            if(s.z > 0.85 && s.z < 1.0) {
-                let dist = Math.abs(screenX - cvs.width/2);
-                if(dist < 60) {
-                    score += 10; sE.innerText = score;
-                    playNote(659, 'sine', 0.1, 0.2);
-                    stars.splice(i, 1);
-                }
-            } else if(s.z >= 1.0) {
-                // 漏掉球，扣血
-                lives--; lE.innerText = lives;
-                playNote(110, 'sawtooth', 0.3, 0.3);
-                stars.splice(i, 1);
-                if(lives <= 0) { running=false; location.reload(); }
-            }
+        #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); z-index: 1000; }
+        .box { background: #1a1a2e; padding: 40px; border-radius: 10px; border: 3px solid #00ff00; text-align: center; width: 90%; max-width: 450px; box-shadow: 0 0 40px rgba(0,255,0,0.6); }
+        h1 { color: #fdbb2d; margin-top: 0; font-size: 32px; letter-spacing: 2px; }
+        p { margin: 10px 0; font-size: 14px; }
+        button { background: #00ff00; border: none; padding: 22px 0; font-size: 26px; font-weight: bold; border-radius: 8px; cursor: pointer; color: #000; width: 100%; margin-top: 20px; box-shadow: 0 8px 0 #008800; }
+        
+        /* 單車龍頭的 CSS 3D 渲染，模擬 FPS 武器 */
+        #bike-hud-container {
+            position: absolute; bottom: -5%; left: 50%; transform: translateX(-50%) rotateX(50deg) rotateZ(0deg);
+            width: 100%; height: 300px; max-width: 600px;
+            pointer-events: none; z-index: 50;
+            perspective: 500px;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out; /* 龍頭晃動平滑 */
         }
-
-        requestAnimationFrame(gameLoop);
-    }
-</script>
-</body>
-</html>
+        #bike-handle {
+            position: absolute; bottom
