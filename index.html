@@ -4,98 +4,137 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>樂富自行車-專業體感版</title>
-    <link rel="manifest" href="manifest.json">
     <style>
         body { margin: 0; background: #050510; color: #fff; overflow: hidden; font-family: sans-serif; touch-action: none; }
         canvas { display: block; background: radial-gradient(circle, #1a1a2e 0%, #050510 100%); }
         #ui { position: absolute; top: 20px; left: 20px; z-index: 10; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px #000; pointer-events: none; }
         #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); z-index: 1000; }
         .box { background: #16213e; padding: 30px; border-radius: 25px; border: 3px solid #00ff00; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 30px rgba(0,255,0,0.4); }
-        h1 { color: #fdbb2d; margin: 0 0 15px; font-size: 28px; }
-        button { background: #00ff00; border: none; padding: 18px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; box-shadow: 0 6px 0 #008800; }
+        h1 { color: #fdbb2d; margin-bottom: 10px; font-size: 28px; }
+        button { background: #00ff00; border: none; padding: 20px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; box-shadow: 0 6px 0 #008800; -webkit-tap-highlight-color: transparent; }
         button:active { transform: translateY(4px); box-shadow: none; }
-        .brand { color: #fdbb2d; font-weight: bold; }
+        .hint { color: #888; font-size: 13px; margin-top: 15px; line-height: 1.5; }
+        #err { color: #ff4757; font-size: 14px; margin-top: 10px; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="ui">關卡: <span id="lvl">1</span> | 分數: <span id="s">0</span> | 生命: <span id="l">3</span></div>
+    <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">3</span></div>
     <div id="menu">
         <div class="box">
-            <h1 id="m-t">樂富自行車<br>體感挑戰</h1>
+            <h1>樂富自行車</h1>
             <p style="color:#00ff00; font-weight:bold;">[ 請確認手機非靜音模式 ]</p>
-            <button id="start-btn">點此啟動遊戲</button>
-            <p style="margin-top:20px; font-size:14px; color:#888;">由 <span class="brand">樂富自行車</span> 專業開發</p>
+            <button id="start-btn">點我開始遊戲</button>
+            <div id="err">啟動失敗！請確認使用 HTTPS 開啟網頁</div>
+            <div class="hint">若點擊無反應，請重新整理頁面<br>並確保在彈窗中點選「允許」</div>
         </div>
     </div>
     <canvas id="c"></canvas>
+
 <script>
-    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), lvE=document.getElementById('lvl'), m=document.getElementById('menu'), btn=document.getElementById('start-btn');
-    let score=0, lives=3, level=1, running=false, stars=[], p={x:0, w:110, v:0}, tilt=0, aCtx=null, timeLeft=15;
+    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn'), errD=document.getElementById('err');
+    let score=0, lives=3, running=false, stars=[], p={x:0, w:110, v:0}, tilt=0, aCtx=null;
 
     function resize(){ cvs.width=window.innerWidth; cvs.height=window.innerHeight; p.x=cvs.width/2-p.w/2; }
     window.onresize=resize; resize();
 
-    function playNote(f, type='sine', d=0.15, vol=0.15) {
+    function playNote(f, type='sine', d=0.2, vol=0.1) {
         if(!aCtx) return;
-        const o=aCtx.createOscillator(), g=aCtx.createGain();
-        o.type=type; o.frequency.setValueAtTime(f, aCtx.currentTime);
-        g.gain.setValueAtTime(vol, aCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
-        o.connect(g); g.connect(aCtx.destination);
-        o.start(); o.stop(aCtx.currentTime+d);
+        try {
+            const o=aCtx.createOscillator(), g=aCtx.createGain();
+            o.type=type; o.frequency.setValueAtTime(f, aCtx.currentTime);
+            g.gain.setValueAtTime(vol, aCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
+            o.connect(g); g.connect(aCtx.destination);
+            o.start(); o.stop(aCtx.currentTime+d);
+        } catch(e){}
     }
 
-    let bgmStep = 0;
-    function bgmLoop() {
+    let bStep = 0;
+    function playBGM() {
         if(!running) return;
-        const melody = [262, 330, 392, 523, 440, 349, 392, 262]; 
-        playNote(melody[bgmStep % melody.length], 'triangle', 0.5, 0.05);
-        bgmStep++;
-        setTimeout(bgmLoop, Math.max(200, 500 - (level * 20)));
+        const melody = [261, 329, 392, 523];
+        playNote(melody[bStep % 4], 'triangle', 0.5, 0.05);
+        bStep++;
+        setTimeout(playBGM, 500);
     }
 
-    // 啟動函數
-    async function initGame() {
-        // 1. 先處理聲音
-        if(!aCtx) aCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if(aCtx.state === 'suspended') await aCtx.resume();
-        
-        // 2. 再處理權限 (iOS)
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            try {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission === 'granted') {
-                    window.addEventListener('deviceorientation', e => { tilt = e.gamma * 1.5; });
+    // --- 核心啟動邏輯 ---
+    async function init() {
+        try {
+            // 1. 啟動音效環境
+            aCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if(aCtx.state === 'suspended') await aCtx.resume();
+            
+            // 2. 請求感應器權限
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const res = await DeviceOrientationEvent.requestPermission();
+                if (res === 'granted') {
+                    window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
+                } else {
+                    alert("必須授權動作感應器才能遊玩！");
+                    return;
                 }
-            } catch (err) { alert("請在設定中開啟動作授權"); }
-        } else {
-            // Android 或其他
-            window.addEventListener('deviceorientation', e => { tilt = e.gamma * 1.5; });
+            } else {
+                window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
+            }
+
+            // 3. 進入遊戲
+            startActualGame();
+        } catch (e) {
+            errD.style.display = 'block';
+            console.error(e);
         }
-
-        // 3. 啟動遊戲
-        m.style.display = 'none';
-        score=0; lives=3; level=1; timeLeft=15; stars=[]; running=true;
-        sE.innerText=0; lE.innerText=3; lvE.innerText=1;
-        bgmLoop();
-        spawnLoop();
     }
 
-    btn.addEventListener('click', initGame);
-    btn.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(); }, {once: true});
-
-    setInterval(() => {
-        if(!running) return;
-        timeLeft--;
-        if(timeLeft<=0) { level++; timeLeft=15; lvE.innerText=level; playNote(880, 'square', 0.6, 0.15); }
-    }, 1000);
-
-    function spawnLoop(){
-        if(!running) return;
-        const r=Math.random(), t=r>0.85?'b':(r>0.7?'r':'g');
-        stars.push({x:Math.random()*(cvs.width-20), y:-20, t:t, c:t=='b'?'#00ff00':(t=='r'?'#ff4757':'#fdbb2d')});
-        setTimeout(spawnLoop, Math.max(200, 1000 - level*70));
+    function startActualGame() {
+        score=0; lives=3; stars=[]; running=true;
+        sE.innerText=0; lE.innerText=3;
+        m.style.display='none';
+        playNote(523, 'sine', 0.2, 0.1);
+        playBGM();
+        spawnStars();
+        gameLoop();
     }
 
-    function loop(){
-        ctx.clearRect(0,0,cvs.width,
+    // 支援點擊與觸摸雙事件
+    btn.onclick = init;
+
+    function spawnStars() {
+        if(!running) return;
+        stars.push({x:Math.random()*(cvs.width-20), y:-20});
+        setTimeout(spawnStars, 900);
+    }
+
+    function gameLoop() {
+        if(!running) return;
+        ctx.clearRect(0,0,cvs.width,cvs.height);
+
+        p.v += (tilt || 0) * 0.18; p.v *= 0.85; p.x += p.v;
+        p.x = Math.max(0, Math.min(cvs.width-p.w, p.x));
+        
+        ctx.fillStyle='#00ff00';
+        ctx.shadowBlur = 15; ctx.shadowColor = '#00ff00';
+        ctx.fillRect(p.x, cvs.height-70, p.w, 18);
+        ctx.shadowBlur = 0;
+
+        for(let i=stars.length-1; i>=0; i--) {
+            let s=stars[i]; s.y += 5;
+            ctx.fillStyle = '#fdbb2d';
+            ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, 7); ctx.fill();
+            
+            if(s.y > cvs.height-75 && s.y < cvs.height-55 && s.x > p.x && s.x < p.x+p.w) {
+                score += 10; sE.innerText=score;
+                playNote(659, 'sine', 0.1, 0.2);
+                stars.splice(i,1);
+            } else if(s.y > cvs.height) {
+                lives--; lE.innerText=lives;
+                playNote(110, 'sawtooth', 0.3, 0.3);
+                stars.splice(i,1);
+                if(lives<=0) { running=false; location.reload(); }
+            }
+        }
+        requestAnimationFrame(gameLoop);
+    }
+</script>
+</body>
+</html>
