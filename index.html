@@ -3,172 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>樂富衝鋒 - 專業版</title>
+    <title>樂富自行車 - 體感挑戰</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; overflow: hidden; font-family: monospace; touch-action: none; -webkit-tap-highlight-color: transparent; }
-        canvas { display: block; }
-
-        /* --- 頂部數據列 --- */
-        #top-ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 100; font-weight: bold; }
-        .stat-item { font-size: 18px; color: #ccff00; }
-        .hp-bar-bg { width: 100px; height: 15px; background: rgba(255,255,255,0.2); display: inline-block; vertical-align: middle; border: 1px solid #fff; }
-        #hp-fill { height: 100%; background: #fff; width: 100%; transition: 0.3s; }
-
-        /* --- 任務簡報框 (左側) --- */
-        #mission-box {
-            position: absolute; top: 60px; left: 20px; width: 280px;
-            border: 2px solid #ccff00; background: rgba(0,0,0,0.8);
-            padding: 15px; z-index: 200; box-shadow: 0 0 15px rgba(204,255,0,0.3);
-        }
-        #mission-box h2 { color: #ccff00; margin: 0 0 10px 0; font-size: 24px; border-bottom: 1px solid #ccff00; }
-        #mission-box p { font-size: 14px; line-height: 1.4; color: #eee; }
-        #start-btn { 
-            background: #ccff00; color: #000; border: none; width: 100%; 
-            padding: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 18px;
-        }
-
-        /* --- 中央準星 --- */
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 40px; height: 40px; pointer-events: none; z-index: 50;
-        }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #ccff00; }
-        #crosshair::before { width: 100%; height: 2px; top: 50%; } /* 橫線 */
-        #crosshair::after { height: 100%; width: 2px; left: 50%; }  /* 直線 */
-
-        /* --- 單車龍頭 HUD --- */
-        #bike-hud {
-            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 600px; pointer-events: none; z-index: 10;
-        }
-        /* 您可以將此 SVG 替換成真正的單車 PNG 圖片網址 */
-        https://github.com/fullgo7788/-bike-/blob/main/Gemini_Generated_Image_gpdxvjgpdxvjgpdx.png { width: 100%; filter: drop-shadow(0 0 10px rgba(0,0,0,0.8)); transition: transform 0.1s; }
-
-        /* --- 右下角 CS 控制鈕 --- */
-        #controls { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 100; }
-        .cs-btn {
-            width: 80px; height: 80px; border-radius: 50%; border: 4px solid #fff;
-            display: flex; justify-content: center; align-items: center;
-            font-weight: bold; font-size: 18px; color: #fff; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5); pointer-events: all;
-        }
-        #fire-btn { background: linear-gradient(#ff4b2b, #ff416c); } /* 開火-紅 */
-        #reload-btn { background: linear-gradient(#2193b0, #6dd5ed); } /* 換彈-藍 */
-        .cs-btn:active { transform: scale(0.9); }
-
-        /* 左下角虛擬搖桿預留區 */
-        #joystick { position: absolute; bottom: 30px; left: 30px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); }
-
+        body { margin: 0; background: #050510; color: #fff; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; background: radial-gradient(circle, #1a1a2e 0%, #050510 100%); }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px #000; pointer-events: none; }
+        #menu { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.9); z-index: 1000; }
+        .box { background: #16213e; padding: 30px; border-radius: 25px; border: 3px solid #00ff00; text-align: center; width: 85%; max-width: 350px; box-shadow: 0 0 30px rgba(0,255,0,0.4); }
+        button { background: #00ff00; border: none; padding: 20px 0; font-size: 24px; font-weight: bold; border-radius: 15px; cursor: pointer; color: #000; width: 100%; box-shadow: 0 6px 0 #008800; -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body>
-
-    <div id="top-ui">
-        <div>HP: <span id="hp-num">100</span>% <div class="hp-bar-bg"><div id="hp-fill"></div></div></div>
-        <div class="stat-item">任務: <span id="score">0</span></div>
-        <div class="stat-item">彈藥: <span id="ammo">10 / 10</span></div>
+    <div id="ui">分數: <span id="s">0</span> | 生命: <span id="l">10</span></div>
+    <div id="menu">
+        <div class="box">
+            <h1 style="color:#fdbb2d">樂富自行車</h1>
+            <p>【專業體感訓練】</p>
+            <button id="start-btn">開始挑戰</button>
+            <p style="font-size: 13px; color: #888; margin-top: 15px;">生命加倍：共有 10 次機會</p>
+        </div>
     </div>
-
-    <div id="mission-box">
-        <h2>1 索都強鋒</h2>
-        <p>請人都在火在待一陣，看就是間的杞有彈，在出空，娘。22 wx 600 奪愛定問彌靈在眼力宵連的能輝。</p>
-        <button id="start-btn">BUTON (開始)</button>
-    </div>
-
-    <div id="crosshair"></div>
-
-    <div id="bike-hud">
-        <svg class="handlebar-img" id="handle-svg" viewBox="0 0 600 300">
-            <path d="M100,250 Q150,100 300,100 Q450,100 500,250" fill="none" stroke="#666" stroke-width="20"/>
-            <rect x="250" y="80" width="100" height="40" rx="5" fill="#333" />
-            <path d="M50,220 L150,120 M450,120 L550,220" stroke="#444" stroke-width="15" />
-        </svg>
-    </div>
-
-    <div id="joystick"></div>
-
-    <div id="controls">
-        <div id="fire-btn" class="cs-btn">開火</div>
-        <div id="reload-btn" class="cs-btn">換彈</div>
-    </div>
-
     <canvas id="c"></canvas>
 
 <script>
-    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'),
-          hpF=document.getElementById('hp-fill'), hpN=document.getElementById('hp-num'),
-          scE=document.getElementById('score'), amE=document.getElementById('ammo'),
-          mBox=document.getElementById('mission-box'), sBtn=document.getElementById('start-btn'),
-          fBtn=document.getElementById('fire-btn'), rBtn=document.getElementById('reload-btn'),
-          hSvg=document.getElementById('handle-svg');
+    const cvs=document.getElementById('c'), ctx=cvs.getContext('2d'), sE=document.getElementById('s'), lE=document.getElementById('l'), m=document.getElementById('menu'), btn=document.getElementById('start-btn');
+    
+    // 2. 變數宣告初始值設定為 10
+    let score=0, lives=10, running=false, stars=[], p={x:0, w:120, v:0}, tilt=0, aCtx=null;
 
-    let score=0, hp=100, ammo=10, running=false, enemies=[], tilt=0, aCtx=null;
-
-    function resize(){ cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
+    function resize(){ cvs.width=window.innerWidth; cvs.height=window.innerHeight; p.x=cvs.width/2-p.w/2; }
     window.onresize=resize; resize();
 
-    // --- 遊戲邏輯 ---
-    sBtn.onclick = async () => {
+    function playNote(f, type='sine', d=0.2, vol=0.1) {
+        if(!aCtx) return;
+        const o=aCtx.createOscillator(), g=aCtx.createGain();
+        o.type=type; o.frequency.value=f;
+        g.gain.setValueAtTime(vol, aCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, aCtx.currentTime+d);
+        o.connect(g); g.connect(aCtx.destination);
+        o.start(); o.stop(aCtx.currentTime+d);
+    }
+
+    let bStep = 0;
+    function playBGM() {
+        if(!running) return;
+        const melody = [261.6, 329.6, 392.0, 523.2];
+        playNote(melody[bStep % 4], 'triangle', 0.5, 0.04);
+        bStep++;
+        setTimeout(playBGM, 500); 
+    }
+
+    btn.onclick = async () => {
         aCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             const res = await DeviceOrientationEvent.requestPermission();
             if (res === 'granted') {
-                window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
-                mBox.style.display = 'none';
+                window.addEventListener('deviceorientation', e => { 
+                    tilt = e.gamma * 3.5; 
+                }, true);
                 start();
             }
         } else {
-            window.addEventListener('deviceorientation', e => { tilt = e.gamma; });
-            mBox.style.display = 'none';
+            window.addEventListener('deviceorientation', e => { tilt = e.gamma * 3.5; }, true);
             start();
         }
     };
 
-    function start(){ running=true; gameLoop(); spawnEnemy(); }
-
-    fBtn.onclick = () => {
-        if(ammo > 0 && running) {
-            ammo--; amE.innerText = `${ammo} / 10`;
-            // 射擊效果...
-        }
-    };
-
-    rBtn.onclick = () => {
-        if(ammo < 10) {
-            setTimeout(() => { ammo=10; amE.innerText = `10 / 10`; }, 1000);
-        }
-    };
-
-    function spawnEnemy(){
-        if(!running) return;
-        enemies.push({x: Math.random()*cvs.width, y: -50, s: 2 + Math.random()*3});
-        setTimeout(spawnEnemy, 1500);
+    function start() {
+        // 3. 遊戲正式啟動時強制重置生命與 UI
+        running=true; 
+        m.style.display='none';
+        score=0; 
+        lives=10; 
+        stars=[]; 
+        p.v=0; 
+        p.x=cvs.width/2-p.w/2;
+        sE.innerText=0; 
+        lE.innerText=10; // 強制更新介面
+        playBGM(); 
+        spawnLoop(); 
+        gameLoop();
     }
 
-    function gameLoop(){
+    function spawnLoop() {
         if(!running) return;
-        ctx.fillStyle = '#050510';
-        ctx.fillRect(0,0,cvs.width,cvs.height);
-
-        // 龍頭跟隨體感晃動
-        hSvg.style.transform = `rotate(${tilt * 0.8}deg)`;
-
-        // 繪製敵人 (簡單模擬)
-        for(let i=enemies.length-1; i>=0; i--){
-            let e = enemies[i]; e.y += e.s;
-            ctx.fillStyle = '#ff4444';
-            ctx.fillRect(e.x, e.y, 30, 30);
-            
-            if(e.y > cvs.height) {
-                enemies.splice(i,1);
-                hp -= 10;
-                hpF.style.width = hp + '%';
-                hpN.innerText = hp;
-                if(hp <= 0) location.reload();
-            }
-        }
-        requestAnimationFrame(gameLoop);
-    }
-</script>
-</body>
-</html>
+        stars
