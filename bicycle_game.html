@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>輪胎英雄 - 樂富自行車開發</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: "Microsoft JhengHei", sans-serif; touch-action: none; user-select: none; }
+        canvas { display: block; background: #87CEEB; }
+        #ui {
+            position: absolute; top: env(safe-area-inset-top, 20px); left: 20px; 
+            color: #000; font-weight: 900; font-size: 26px;
+            text-shadow: 2px 2px 0 #fff; pointer-events: none; z-index: 100;
+        }
+        #brand {
+            position: absolute; bottom: 15px; left: 15px; 
+            color: #000; font-weight: bold; font-size: 14px;
+            text-shadow: 1px 1px 0 #fff; z-index: 100;
+        }
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 200;
+        }
+        #msg-box {
+            background: #fff; color: #333; padding: 25px; border: 4px solid #000;
+            border-radius: 15px; text-align: center; width: 280px;
+        }
+        .btn {
+            display: inline-block; margin-top: 15px; padding: 12px 25px;
+            background: #ff0000; color: #fff; border-radius: 50px;
+            font-weight: bold; font-size: 20px; cursor: pointer;
+        }
+    </style>
+</head>
+<body onpointerdown="handleAction(event)">
+
+<div id="ui">
+    <div>分數: <span id="score">0</span></div>
+    <div style="font-size: 16px;">最高紀錄: <span id="highScore">0</span></div>
+</div>
+<div id="brand">樂富自行車開發</div>
+
+<div id="overlay" id="startScreen">
+    <div id="msg-box">
+        <h2 style="margin:0">輪胎英雄</h2>
+        <p style="font-size:14px">避開香蕉皮、惡犬與狗屎！<br>(速度已調慢 30%)</p>
+        <div class="btn">點擊開始</div>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('highScore');
+const overlay = document.getElementById('overlay');
+
+let gameState = 'START'; 
+let score = 0;
+let highScore = localStorage.getItem('bicycleHighScore') || 0;
+highScoreEl.innerText = highScore;
+
+let player = { x: 60, y: 0, w: 50, h: 50, vy: 0, jumped: false };
+let obstacles = [];
+let coins = [];
+let bgX = 0;
+let lastObstacleX = 0;
+
+// --- 瑪利歐風格音效系統 ---
+let audioCtx = null;
+let bgmSequence = 0;
+let bgmTimer = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playNote(freq, dur, type = 'square', vol = 0.04) {
+    if(!audioCtx || gameState !== 'PLAYING') return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function playMarioBGM() {
+    if (gameState !== 'PLAYING') return;
+    const melody = [330, 330, 0, 330, 0, 262, 330, 0, 392, 0, 0, 0, 196, 0, 0, 0];
+    let note = melody[bgmSequence % melody.length];
+    if(note > 0) playNote(note, 0.1, 'square');
+    if(bgmSequence % 4 === 0) playNote(165, 0.15, 'triangle', 0.06);
+    bgmSequence++;
+    bgmTimer = setTimeout(playMarioBGM, 150);
+}
+
+function playSfx(freq, type, dur, slide = false, vol = 0.08) {
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    if(slide) osc.frequency.exponentialRampToValueAtTime(freq/5, audioCtx.currentTime + dur);
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    player.y = canvas.height * 0.7 - player.h;
+}
+window.onresize = resize;
+resize();
+
+function handleAction(e) {
+    if(e) e.preventDefault();
+    initAudio();
+
+    if (gameState === 'PLAYING') {
+        if (!player.jumped) {
+            player.vy = -15; // 稍微調小跳躍力，更適合手機
+            player.jumped = true;
+            playSfx(523, 'square', 0.1); 
+        }
+    } else {
+        score = 0; scoreEl.innerText = '0';
+        obstacles = []; coins = [];
+        lastObstacleX = 0; bgmSequence = 0;
+        gameState = 'PLAYING';
+        overlay.style.display = 'none';
+        if (bgmTimer) clearTimeout(bgmTimer);
+        playMarioBGM();
+    }
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    bgX -= 4; // 慢速
+    if (bgX <= -canvas.width) bgX = 0;
+
+    player.vy += 0.7; 
+    player.y += player.vy;
+    let ground = canvas.height * 0.7 - player.h;
+    if (player.y > ground) { player.y = ground; player.vy = 0; player.jumped = false; }
+
+    // 怪物生成：間距拉大
+    if (canvas.width - lastObstacleX > 450 && Math.random() < 0.008) {
+        const types = ['🍌', '🐕', '💩'];
+        obstacles.push({ x: canvas.width, y: canvas.height * 0.7 - 45, icon: types[Math.floor(Math.random()*3)] });
+        lastObstacleX = canvas.width;
+    }
+    if (Math.random() < 0.02) coins.push({ x: canvas.width, y: canvas.height * 0.7 - 140 - Math.random() * 80 });
+
+    obstacles.forEach((o, i) => {
+        o.x -= 5.5;
+        if (i === obstacles.length - 1) lastObstacleX = o.x;
+        if (Math.abs(player.x - o.x) < 35 && Math.abs(player.y - o.y) < 35) {
+            gameState = 'GAME_OVER';
+            overlay.style.display = 'flex';
+            document.querySelector('#msg-box h2').innerText = "遊戲結束！";
+            document.querySelector('.btn').innerText = "再試一次";
+            playSfx(150, 'sawtooth', 0.6, true, 0.2); 
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('bicycleHighScore', highScore);
+                highScoreEl.innerText = highScore;
+            }
+        }
+    });
+
+    coins.forEach((c, i) => {
+        c.x -= 5.5;
+        if (Math.abs(player.x - c.x) < 35 && Math.abs(player.y - c.y) < 35) {
+            score += 10; scoreEl.innerText = score;
+            playSfx(900, 'sine', 0.08); 
+            coins.splice(i, 1);
+        }
+    });
+    obstacles = obstacles.filter(o => o.x > -100);
+    coins = coins.filter(c => c.x > -100);
+}
+
+function draw() {
+    ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#2E7D32';
+    for (let i = 0; i < 2; i++) {
+        let x = bgX + i * canvas.width;
+        ctx.beginPath(); ctx.moveTo(x, canvas.height * 0.7);
+        ctx.lineTo(x + canvas.width / 2, canvas.height * 0.35);
+        ctx.lineTo(x + canvas.width, canvas.height * 0.7); ctx.fill();
+    }
+    ctx.fillStyle = '#5D4037'; ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
+    ctx.fillStyle = '#689F38'; ctx.fillRect(0, canvas.height * 0.7, canvas.width, 12);
+
+    ctx.save();
+    ctx.translate(player.x + 25, player.y + 25);
+    ctx.scale(-1, 1); ctx.font = '45px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('🚴', 0, 15);
+    ctx.restore();
+
+    ctx.font = '35px Arial';
+    obstacles.forEach(o => ctx.fillText(o.icon, o.x, o.y + 30));
+    coins.forEach(c => ctx.fillText('🪙', c.x, c.y + 25));
+
+    update();
+    requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
