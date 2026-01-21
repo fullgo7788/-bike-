@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 - 樂富自行車開發</title>
+    <title>輪胎英雄 - 樂富自行車</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; }
         canvas { display: block; }
@@ -31,13 +31,13 @@
 
 <div id="ui">
     <div>分數: <span id="score">0</span></div>
-    <div style="font-size: 14px;">最高: <span id="highScore">0</span></div>
+    <div style="font-size: 14px;">最高紀錄: <span id="highScore">0</span></div>
 </div>
 
 <div id="overlay">
     <div id="msg-box">
         <h2 id="msg-title">輪胎英雄</h2>
-        <p style="color: red; font-weight: bold;">⚠️ 惡犬強襲注意！</p>
+        <p style="color: #333; font-weight: bold;">⚠️ 小心路面汽車！</p>
         <div class="btn">開始挑戰</div>
     </div>
 </div>
@@ -56,47 +56,53 @@ let score = 0;
 let highScore = localStorage.getItem('bicycleHighScore') || 0;
 highScoreEl.innerText = highScore;
 
-let player = { x: 40, y: 0, vy: 0, jumped: false };
+let player = { x: 50, y: 0, vy: 0, jumped: false };
 let obstacles = [];
 let coins = [];
 let bgX = 0;
 let lastObstacleX = 0;
 
 let audioCtx = null;
-let bgmTimer = null;
 
+// 手機音效初始化
 function initAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-function barkEffect() {
+function playSfx(freq, type, dur) {
     if(!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
     g.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
     osc.connect(g).connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
 }
 
-function drawBullyDog(x, y, size) {
+// 繪製紅色汽車 (取代惡犬)
+function drawCar(x, y, size) {
     ctx.save();
     ctx.translate(x, y);
-    // 耳朵
-    ctx.fillStyle = '#4A2B11';
-    ctx.beginPath(); ctx.moveTo(size*0.1, size*0.2); ctx.lineTo(size*0.05, 0); ctx.lineTo(size*0.3, size*0.2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(size*0.9, size*0.2); ctx.lineTo(size*0.95, 0); ctx.lineTo(size*0.7, size*0.2); ctx.fill();
-    // 臉與下巴
-    ctx.fillStyle = '#8B5A2B';
-    ctx.beginPath(); ctx.ellipse(size/2, size*0.5, size*0.5, size*0.4, 0, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
-    // 獠牙
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.moveTo(size*0.25, size*0.6); ctx.lineTo(size*0.15, size*0.85); ctx.lineTo(size*0.35, size*0.7); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(size*0.75, size*0.6); ctx.lineTo(size*0.85, size*0.85); ctx.lineTo(size*0.65, size*0.7); ctx.fill();
+    // 車身
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, size*0.4, size, size*0.4); 
+    // 車頂
+    ctx.beginPath();
+    ctx.moveTo(size*0.2, size*0.4);
+    ctx.lineTo(size*0.3, size*0.1);
+    ctx.lineTo(size*0.7, size*0.1);
+    ctx.lineTo(size*0.8, size*0.4);
+    ctx.fill();
+    // 窗戶
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(size*0.35, size*0.15, size*0.3, size*0.2);
+    // 輪胎
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(size*0.2, size*0.8, size*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(size*0.8, size*0.8, size*0.15, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 }
 
@@ -115,20 +121,22 @@ function handleAction(e) {
         if (!player.jumped) {
             player.vy = -15;
             player.jumped = true;
+            playSfx(400, 'sine', 0.1);
         }
     } else {
         score = 0; scoreEl.innerText = '0';
         obstacles = []; coins = [];
-        lastObstacleX = 0;
+        lastObstacleX = canvas.width;
         gameState = 'PLAYING';
         overlay.style.display = 'none';
+        playSfx(523, 'square', 0.2);
     }
 }
 
 function update() {
     if (gameState !== 'PLAYING') return;
     
-    bgX -= 3;
+    bgX -= 4;
     if (bgX <= -canvas.width) bgX = 0;
 
     player.vy += 0.8; 
@@ -136,27 +144,28 @@ function update() {
     let groundY = canvas.height * 0.7 - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
 
-    // 怪物生成邏輯：根據螢幕寬度的 60% 作為間隔
-    if (canvas.width - lastObstacleX > canvas.width * 0.6) {
-        const isDog = Math.random() > 0.5;
-        if(isDog) {
-            barkEffect();
-            obstacles.push({ x: canvas.width, y: canvas.height * 0.7 - 60, type: 'dog', speed: 7 });
+    // 怪物生成：大幅縮短間隔，確保手機直向也能看到很多車
+    if (canvas.width - lastObstacleX > (canvas.width * 0.45)) {
+        const isCar = Math.random() > 0.4;
+        if(isCar) {
+            obstacles.push({ x: canvas.width, y: canvas.height * 0.7 - 55, type: 'car', speed: 6 + Math.random()*3 });
         } else {
-            obstacles.push({ x: canvas.width, y: canvas.height * 0.7 - 40, type: 'banana', speed: 4 });
+            obstacles.push({ x: canvas.width, y: canvas.height * 0.7 - 35, type: 'banana', speed: 5 });
         }
         lastObstacleX = canvas.width;
     }
 
-    if (Math.random() < 0.02) coins.push({ x: canvas.width, y: canvas.height * 0.7 - 120 - Math.random()*60 });
+    if (Math.random() < 0.03) coins.push({ x: canvas.width, y: canvas.height * 0.7 - 130 - Math.random()*70 });
 
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
-        if (o.x > canvas.width * 0.4) lastObstacleX = o.x;
-        if (Math.abs(player.x - o.x) < 35 && Math.abs(player.y - o.y) < 35) {
+        if (o.x > canvas.width * 0.3) lastObstacleX = o.x;
+        // 碰撞檢測
+        if (Math.abs(player.x - o.x) < 40 && Math.abs(player.y - o.y) < 40) {
             gameState = 'OVER';
             overlay.style.display = 'flex';
-            document.getElementById('msg-title').innerText = "遊戲結束";
+            document.getElementById('msg-title').innerText = "發生車禍了！";
+            playSfx(150, 'sawtooth', 0.5);
             if(score > highScore) {
                 highScore = score;
                 localStorage.setItem('bicycleHighScore', highScore);
@@ -166,9 +175,10 @@ function update() {
     });
 
     coins.forEach((c, i) => {
-        c.x -= 4;
-        if (Math.abs(player.x - c.x) < 30 && Math.abs(player.y - c.y) < 30) {
+        c.x -= 5;
+        if (Math.abs(player.x - c.x) < 35 && Math.abs(player.y - c.y) < 35) {
             score += 10; scoreEl.innerText = score;
+            playSfx(880, 'sine', 0.05);
             coins.splice(i, 1);
         }
     });
@@ -186,26 +196,27 @@ function draw() {
     for(let i=0; i<2; i++) {
         let x = bgX + i * canvas.width;
         ctx.beginPath(); ctx.moveTo(x, canvas.height*0.7);
-        ctx.lineTo(x + canvas.width/2, canvas.height*0.4);
+        ctx.lineTo(x + canvas.width/2, canvas.height*0.3);
         ctx.lineTo(x + canvas.width, canvas.height*0.7); ctx.fill();
     }
 
-    // 地面
-    ctx.fillStyle = '#5D4037'; ctx.fillRect(0, canvas.height*0.7, canvas.width, canvas.height*0.3);
-    ctx.fillStyle = '#8BC34A'; ctx.fillRect(0, canvas.height*0.7, canvas.width, 10);
+    // 地面 (柏油路風格)
+    ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height*0.7, canvas.width, canvas.height*0.3);
+    ctx.fillStyle = '#fff'; 
+    for(let i=0; i<10; i++) ctx.fillRect((bgX*1.5 % 100) + i*100, canvas.height*0.85, 40, 5); // 分隔線
 
-    // 主角
-    ctx.font = '40px Arial';
+    // 主角 (永遠向右)
+    ctx.font = '45px Arial';
     ctx.fillText('🚴', player.x, player.y + 40);
 
     // 障礙物
     obstacles.forEach(o => {
-        if(o.type === 'dog') drawBullyDog(o.x, o.y, 60);
+        if(o.type === 'car') drawCar(o.x, o.y, 70);
         else ctx.fillText('🍌', o.x, o.y + 35);
     });
 
     // 金幣
-    ctx.font = '30px Arial';
+    ctx.font = '35px Arial';
     coins.forEach(c => ctx.fillText('🪙', c.x, c.y + 25));
 
     update();
