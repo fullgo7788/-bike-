@@ -7,29 +7,33 @@
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; }
         canvas { display: block; }
-        #ui { position: absolute; top: 15px; left: 15px; color: #000; font-weight: 900; font-size: 22px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
-        #msg-box { background: #fff; padding: 40px 20px; border: 5px solid #000; border-radius: 25px; text-align: center; width: 85%; max-width: 320px; }
-        .btn { display: inline-block; padding: 20px 50px; background: #ff0000; color: #fff; border-radius: 60px; font-weight: bold; font-size: 26px; cursor: pointer; border: none; box-shadow: 0 8px 0 #900; -webkit-tap-highlight-color: transparent; }
-        .btn:active { transform: translateY(4px); box-shadow: 0 4px 0 #900; }
+        #ui { position: absolute; top: 15px; left: 15px; color: #000; font-weight: 900; font-size: 20px; text-shadow: 1px 1px 0 #fff; z-index: 100; pointer-events: none; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 200; }
+        #msg-box { background: #fff; padding: 30px 20px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 80%; max-width: 300px; }
+        .btn { display: inline-block; padding: 15px 40px; background: #00C853; color: #fff; border-radius: 50px; font-weight: bold; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 6px 0 #1B5E20; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div>分數: <span id="score">0</span></div>
-    <div style="font-size: 16px;">最高紀錄: <span id="highScore">0</span></div>
+    <div style="font-size: 14px;">最高: <span id="highScore">0</span></div>
 </div>
 
 <div id="overlay">
     <div id="msg-box">
         <h2 id="msg-title">輪胎英雄</h2>
-        <p style="margin-bottom: 25px; font-weight: bold;">請解除手機靜音開關<br>點擊下方啟動音效</p>
-        <button class="btn" id="startBtn">啟動音樂</button>
+        <p style="font-weight: bold;">[ 超慢速練習版 ]</p>
+        <p>請確認手機**非靜音模式**</p>
+        <button class="btn" id="startBtn">開始挑戰</button>
     </div>
 </div>
 
 <canvas id="gameCanvas"></canvas>
+
+<audio id="sndJump" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+<audio id="sndCoin" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3" preload="auto"></audio>
+<audio id="sndOver" src="https://assets.mixkit.co/active_storage/sfx/2530/2530-preview.mp3" preload="auto"></audio>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -39,66 +43,34 @@ const highScoreEl = document.getElementById('highScore');
 const overlay = document.getElementById('overlay');
 const startBtn = document.getElementById('startBtn');
 
+// 音效元素
+const sndJump = document.getElementById('sndJump');
+const sndCoin = document.getElementById('sndCoin');
+const sndOver = document.getElementById('sndOver');
+
 let gameState = 'START'; 
 let score = 0;
 let highScore = localStorage.getItem('bicycleHighScore') || 0;
 highScoreEl.innerText = highScore;
 
-const WORLD_SPEED = 2.5; 
-let player = { x: 60, y: 0, vy: 0, jumped: false };
+// 速度更慢 (從 2.5 降到 1.8)
+const WORLD_SPEED = 1.8; 
+let player = { x: 50, y: 0, vy: 0, jumped: false };
 let obstacles = [];
 let coins = [];
 let bgX = 0;
 let distanceCounter = 0;
 
-// --- 核心音效修正區 ---
-let audioCtx = null;
-let masterGain = null;
-
-function initAudioSystem() {
-    try {
-        window.AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        masterGain = audioCtx.createGain();
-        masterGain.connect(audioCtx.destination);
-        masterGain.gain.value = 0.2;
-
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        
-        // 強制解鎖：播放一個 0.01 秒的極短音
-        const buf = audioCtx.createBuffer(1, 1, 22050);
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioCtx.destination);
-        src.start(0);
-    } catch(e) {
-        console.error("Audio system failed", e);
-    }
+function playSound(audio) {
+    audio.currentTime = 0;
+    audio.play().catch(e => console.log("音效遭攔截"));
 }
 
-function playNote(freq, dur, type = 'sine') {
-    if (!audioCtx || audioCtx.state !== 'running') return;
-    const osc = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-    osc.connect(g).connect(masterGain);
-    osc.start();
-    osc.stop(audioCtx.currentTime + dur);
-}
-
-// 綁定所有可能的點擊事件來解鎖音訊
-['click', 'touchstart', 'touchend'].forEach(evt => {
-    startBtn.addEventListener(evt, (e) => {
-        e.preventDefault();
-        if (!audioCtx) initAudioSystem();
-        startGame();
-    }, { once: true });
-});
+startBtn.onclick = function() {
+    // 點擊瞬間啟動所有音效（靜音播放一次以解鎖）
+    [sndJump, sndCoin, sndOver].forEach(s => { s.play(); s.pause(); });
+    startGame();
+};
 
 function startGame() {
     score = 0; scoreEl.innerText = '0';
@@ -106,29 +78,22 @@ function startGame() {
     distanceCounter = 0;
     gameState = 'PLAYING';
     overlay.style.display = 'none';
-    
-    // 啟動成功的聲音回饋
-    playNote(523.25, 0.3, 'square'); // Do
-    setTimeout(() => playNote(659.25, 0.3, 'square'), 100); // Mi
 }
 
-// 跳躍與音效
-window.addEventListener('touchstart', (e) => {
+// 跳躍操作
+window.onpointerdown = function(e) {
     if (gameState === 'PLAYING' && !player.jumped) {
-        player.vy = -14;
+        player.vy = -12; // 慢速版跳躍力也調小，比較好控制
         player.jumped = true;
-        playNote(880, 0.1, 'sine');
+        playSound(sndJump);
     }
-}, { passive: false });
+};
 
 function drawCar(x, y, size) {
     ctx.save();
     ctx.translate(x, y);
     ctx.fillStyle = '#ff0000';
     ctx.fillRect(0, size*0.4, size, size*0.4); 
-    ctx.beginPath();
-    ctx.moveTo(size*0.2, size*0.4); ctx.lineTo(size*0.35, size*0.1);
-    ctx.lineTo(size*0.65, size*0.1); ctx.lineTo(size*0.8, size*0.4); ctx.fill();
     ctx.fillStyle = '#333';
     ctx.beginPath(); ctx.arc(size*0.25, size*0.8, size*0.15, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(size*0.75, size*0.8, size*0.15, 0, Math.PI*2); ctx.fill();
@@ -150,27 +115,28 @@ function update() {
     distanceCounter += WORLD_SPEED;
     if (bgX <= -canvas.width) bgX = 0;
 
-    player.vy += 0.7;
+    player.vy += 0.6; // 重力也調慢
     player.y += player.vy;
     let groundY = canvas.height * 0.7 - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
 
-    if (distanceCounter > 280) { 
-        const isCar = Math.random() > 0.4;
-        if(isCar) obstacles.push({ x: canvas.width + 50, y: canvas.height * 0.7 - 60, type: 'car', speed: 3.5 + Math.random()*2 });
+    // 怪物間隔拉長 (從 280 變 350)
+    if (distanceCounter > 350) { 
+        const isCar = Math.random() > 0.3;
+        if(isCar) obstacles.push({ x: canvas.width + 50, y: canvas.height * 0.7 - 60, type: 'car', speed: WORLD_SPEED + 1 });
         else obstacles.push({ x: canvas.width + 50, y: canvas.height * 0.7 - 40, type: 'banana', speed: WORLD_SPEED });
         distanceCounter = 0;
     }
 
-    if (Math.random() < 0.02) coins.push({ x: canvas.width + 20, y: canvas.height * 0.7 - 120 - Math.random()*80 });
+    if (Math.random() < 0.015) coins.push({ x: canvas.width + 20, y: canvas.height * 0.7 - 120 - Math.random()*80 });
 
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
-        if (Math.abs(player.x - o.x) < 35 && Math.abs(player.y - o.y) < 40) {
+        if (Math.abs(player.x - o.x) < 30 && Math.abs(player.y - o.y) < 35) {
             gameState = 'OVER';
             overlay.style.display = 'flex';
-            document.getElementById('msg-title').innerText = "遊戲結束";
-            playNote(110, 0.5, 'sawtooth');
+            document.getElementById('msg-title').innerText = "撞到了！";
+            playSound(sndOver);
             if(score > highScore) {
                 highScore = score;
                 localStorage.setItem('bicycleHighScore', highScore);
@@ -183,7 +149,7 @@ function update() {
         c.x -= WORLD_SPEED;
         if (Math.abs(player.x - c.x) < 30 && Math.abs(player.y - c.y) < 35) {
             score += 10; scoreEl.innerText = score;
-            playNote(1046, 0.05, 'sine');
+            playSound(sndCoin);
             coins.splice(i, 1);
         }
     });
@@ -200,26 +166,21 @@ function draw() {
     for(let i=0; i<3; i++) {
         let x = (bgX % canvas.width) + i * canvas.width;
         ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height*0.7);
-        ctx.lineTo(x - canvas.width/2, canvas.height*0.35);
+        ctx.lineTo(x - canvas.width/2, canvas.height*0.4);
         ctx.lineTo(x, canvas.height*0.7); ctx.fill();
     }
 
     ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height*0.7, canvas.width, canvas.height*0.3);
-    ctx.fillStyle = '#fff'; 
-    for(let i=0; i<15; i++) {
-        let segX = (bgX * 1.5 % 200) + i * 200;
-        ctx.fillRect(segX, canvas.height*0.85, 50, 6);
-    }
-
+    
     ctx.save();
     ctx.translate(player.x + 25, player.y + 25);
-    ctx.scale(-1, 1);
+    ctx.scale(-1, 1); 
     ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🚴', 0, 0);
     ctx.restore();
 
     obstacles.forEach(o => {
-        if(o.type === 'car') drawCar(o.x, o.y, 75);
+        if(o.type === 'car') drawCar(o.x, o.y, 70);
         else { ctx.font = '40px Arial'; ctx.fillText('🍌', o.x, o.y + 35); }
     });
     ctx.font = '35px Arial';
