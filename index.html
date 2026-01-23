@@ -8,8 +8,6 @@
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; height: -webkit-fill-available; }
         canvas { display: block; width: 100%; height: 100%; }
-        
-        /* 頂部橫向狀態欄 */
         #ui { 
             position: absolute; top: 0; left: 0; width: 100%; 
             display: flex; justify-content: space-around; align-items: center; 
@@ -19,14 +17,12 @@
         }
         .stat-item { display: flex; align-items: center; gap: 4px; }
         #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
-        
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
         .action-btn { width: 45px; height: 45px; background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #fff; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
         #leftBtn { width: 85px; height: 85px; font-size: 38px; }
         #fireBtn { background: rgba(211, 47, 47, 0.4); border-color: #ff8a80; opacity: 0.5; }
         #fireBtn.active { background: rgba(211, 47, 47, 0.9); opacity: 1; box-shadow: 0 0 10px #ff0000; }
-        
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 280px; }
         .btn { display: inline-block; padding: 18px 45px; background: #FFD600; color: #000; border-radius: 50px; font-weight: bold; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 6px 0 #A68B00; }
@@ -38,7 +34,7 @@
     <div class="stat-item">LV: <span id="levelText">1</span></div>
     <div class="stat-item">LIFE: <span id="livesText">👤👤👤</span></div>
     <div class="stat-item">HP: <span id="hpText" style="color: #e91e63;">❤️❤️❤️❤️❤️</span></div>
-    <div class="stat-item">SCORE: <span id="score">0</span></div>
+    <div class="stat-item">SCORE: <span id="score">0</span> / 2500</div>
 </div>
 <div id="power-ui"><span id="timer">20</span>s 🔥</div>
 
@@ -100,7 +96,13 @@ let isPressingGo = false;
 let audioCtx = null;
 let musicTimer = null;
 let melodyStep = 0;
-const MELODY = [262, 330, 392, 523, 392, 330, 262, 0, 440, 440, 392, 0];
+const MELODIES = [
+    [262, 330, 392, 523, 392, 330, 262, 0], 
+    [293, 349, 440, 587, 440, 349, 293, 0], 
+    [329, 392, 493, 659, 329, 392, 493, 0], 
+    [262, 392, 262, 440, 262, 349, 262, 330] 
+];
+const WAVEFORMS = ['triangle', 'square', 'sine', 'sawtooth'];
 
 function initAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -121,10 +123,13 @@ function playSound(freq, dur, vol, type = 'sine') {
 
 function loopBGM() {
     if (gameState !== 'PLAYING') return;
-    let freq = MELODY[melodyStep % MELODY.length];
-    playSound(freq, 0.25, 0.1, 'triangle'); 
+    let mIdx = (level - 1) % MELODIES.length;
+    let melody = MELODIES[mIdx];
+    let wave = WAVEFORMS[mIdx];
+    let freq = melody[melodyStep % melody.length];
+    playSound(freq, 0.25, 0.08, wave); 
     melodyStep++;
-    let tempo = Math.max(160, 350 - currentSpeed * 25);
+    let tempo = Math.max(140, 320 - (currentSpeed * 20));
     musicTimer = setTimeout(loopBGM, tempo);
 }
 
@@ -167,6 +172,7 @@ startBtn.onclick = () => {
     gameState = 'PLAYING';
     overlay.style.display = 'none';
     updateUI();
+    clearTimeout(musicTimer);
     setTimeout(() => { resize(); loopBGM(); }, 300);
 };
 
@@ -180,19 +186,15 @@ resize();
 
 function update() {
     if (gameState !== 'PLAYING') return;
-    
     const maxS = MAX_SPEED_BASE + speedOffset;
     if (isPressingGo) currentSpeed = Math.min(maxS, currentSpeed + ACCEL);
     else currentSpeed = Math.max(0, currentSpeed - FRICTION);
-    
     bgX -= currentSpeed;
     distanceCounter += currentSpeed;
     if (bgX <= -canvas.width) bgX = 0;
-    
     player.vy += GRAVITY; player.y += player.vy;
     let groundY = canvas.height * ROAD_Y_RATIO - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
-    
     if (player.powerTime > 0) {
         player.powerTime -= 1/60;
         powerUi.style.display = 'block';
@@ -200,47 +202,43 @@ function update() {
         fireBtn.classList.add('active');
         if (player.powerTime <= 0) { powerUi.style.display = 'none'; fireBtn.classList.remove('active'); }
     }
-
     if (invincibleFrame > 0) invincibleFrame--;
 
-    if (score >= 2000) {
+    // 晉級門檻改為 2500
+    if (score >= 2500) {
         score = 0; level++; lives++; speedOffset += 0.3;
-        playSound(1000, 0.5, 0.2, 'sine');
+        playSound(1200, 0.4, 0.15, 'sine');
         updateUI();
     }
 
     if (distanceCounter > (450 - speedOffset * 10)) { 
         const rand = Math.random();
         if (rand < 0.05) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'heart' });
-        else if (rand < 0.2) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'red' });
-        else if (rand < 0.7) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'gold' });
-        
+        else if (rand < 0.15) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'red' });
+        else if (rand < 0.6) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'gold' });
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 250, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
         distanceCounter = 0;
     }
-
     bullets.forEach((b, bi) => {
         b.x += 12;
         obstacles.forEach((o, oi) => {
             if (Math.abs(b.x - o.x) < 50 && Math.abs(b.y - o.y) < 50) {
                 obstacles.splice(oi, 1); bullets.splice(bi, 1);
                 score += 50; updateUI();
-                playSound(200, 0.3, 0.2, 'sawtooth');
+                playSound(200, 0.2, 0.15, 'sawtooth');
             }
         });
     });
-
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
         if (invincibleFrame === 0 && Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
             hp--; invincibleFrame = 90;
-            playSound(150, 0.3, 0.15, 'sawtooth');
+            playSound(100, 0.3, 0.1, 'sawtooth');
             if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; endStatus.style.display = 'block'; overlay.style.display = 'flex'; } }
             updateUI();
         }
     });
-
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
@@ -251,7 +249,6 @@ function update() {
             updateUI();
         }
     });
-
     obstacles = obstacles.filter(o => o.x > -200);
     coins = coins.filter(c => c.x > -100);
     bullets = bullets.filter(b => b.x < canvas.width + 100);
@@ -266,7 +263,6 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); ctx.fill();
     }
     ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
-    
     if (invincibleFrame % 10 < 5) {
         ctx.save();
         ctx.translate(player.x + 25, player.y + 25);
@@ -275,7 +271,6 @@ function draw() {
         ctx.fillText('🚴', 0, 0);
         ctx.restore();
     }
-    
     bullets.forEach(b => { ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y); });
     obstacles.forEach(o => {
         if(o.type === 'car') {
