@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 V7 - 音樂倍增版</title>
+    <title>輪胎英雄 V8 - 佈局優化版</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; }
         canvas { display: block; }
@@ -39,9 +39,9 @@
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="msg-title">輪胎英雄 V7</h2>
-        <p style="font-weight: bold; color: #333;">音樂聲量已翻倍！<br>音效維持原樣。</p>
-        <button class="btn" id="startBtn">開始挑戰</button>
+        <h2 id="msg-title">輪胎英雄 V8</h2>
+        <p style="font-weight: bold; color: #333;">角色已向右平移<br>成對金幣等你收集！</p>
+        <button class="btn" id="startBtn">開始遊戲</button>
     </div>
 </div>
 
@@ -67,7 +67,8 @@ const FRICTION = 0.05;
 const GRAVITY = 0.52; 
 const JUMP_FORCE = -14.2; 
 
-let player = { x: 85, y: 0, vy: 0, jumped: false };
+// 1. 人物初始位置向右移動 (x 從 85 改為 200)
+let player = { x: 200, y: 0, vy: 0, jumped: false };
 let obstacles = [];
 let coins = [];
 let bgX = 0;
@@ -100,8 +101,7 @@ function playSound(freq, dur, vol, type = 'sine') {
 function loopBGM() {
     if (gameState !== 'PLAYING') return;
     let freq = MELODY[melodyStep % MELODY.length];
-    // 音樂音量獨立翻倍至 0.12 (相較於最初的 0.03 已增大 4 倍，相較 V6 增大 2 倍)
-    playSound(freq, 0.25, 0.12, 'triangle'); 
+    playSound(freq, 0.25, 0.12, 'triangle'); // 音樂大聲
     melodyStep++;
     let tempo = Math.max(160, 350 - currentSpeed * 25);
     musicTimer = setTimeout(loopBGM, tempo);
@@ -117,8 +117,7 @@ rBtn.addEventListener('touchstart', (e) => {
     if (!player.jumped && gameState === 'PLAYING') {
         player.vy = JUMP_FORCE;
         player.jumped = true;
-        // 音效維持原本適中的音量 0.08
-        playSound(880, 0.15, 0.08, 'sine'); 
+        playSound(880, 0.15, 0.08, 'sine'); // 音效適中
     }
 });
 
@@ -151,30 +150,39 @@ function update() {
     player.y += player.vy;
     let groundY = canvas.height * 0.7 - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
+
+    // 障礙物與金幣生成
     if (distanceCounter > 450) { 
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 100, y: canvas.height * 0.7 - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
+        
+        // 2. 每次生成金幣時，一次出現兩個位置（成對）
+        if (Math.random() < 0.6) {
+            let coinHeight = canvas.height * 0.7 - 160;
+            coins.push({ x: canvas.width + 250, y: coinHeight });
+            coins.push({ x: canvas.width + 310, y: coinHeight });
+        }
         distanceCounter = 0;
     }
+
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
         if (Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
             gameState = 'OVER';
             overlay.style.display = 'flex';
-            // 音效音量維持原樣 0.15
             playSound(150, 0.6, 0.15, 'sawtooth'); 
         }
     });
-    if (Math.random() < 0.02) coins.push({ x: canvas.width + 50, y: canvas.height * 0.7 - 160 });
+
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
             score += 10; scoreEl.innerText = score;
-            // 音效音量維持原樣 0.05
             playSound(1200, 0.1, 0.05, 'sine'); 
             coins.splice(i, 1);
         }
     });
+
     obstacles = obstacles.filter(o => o.x > -200);
     coins = coins.filter(c => c.x > -100);
 }
