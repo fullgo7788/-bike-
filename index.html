@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 V9 - 全螢幕</title>
+    <title>輪胎英雄 V10 - 寬廣視野</title>
     <style>
-        /* 確保全螢幕背景與防止邊界問題 */
         :root { height: -webkit-fill-available; }
         body { 
             margin: 0; overflow: hidden; background: #87CEEB; 
@@ -17,14 +16,14 @@
         #ui { position: absolute; top: 15px; left: 20px; color: #000; font-weight: 900; font-size: 20px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
         
         #controls {
-            position: absolute; bottom: 30px; left: 0; width: 100%;
+            position: absolute; bottom: 25px; left: 0; width: 100%;
             display: flex; justify-content: space-between; padding: 0 50px; box-sizing: border-box; z-index: 150;
         }
         .ctrl-btn {
-            width: 90px; height: 90px; background: rgba(0,0,0,0.7);
+            width: 85px; height: 85px; background: rgba(0,0,0,0.7);
             border: 3px solid #fff; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 40px; color: #fff;
+            font-size: 38px; color: #fff;
             backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent;
         }
         
@@ -47,9 +46,9 @@
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="msg-title">輪胎英雄 V9</h2>
-        <p style="font-weight: bold; color: #333;">點擊開始進入全螢幕模式<br>橫向遊玩體驗最佳</p>
-        <button class="btn" id="startBtn">進入全螢幕並開始</button>
+        <h2 id="msg-title">輪胎英雄 V10</h2>
+        <p style="font-weight: bold; color: #333;">路面已優化，視野更廣！<br>點擊按鈕啟動全螢幕</p>
+        <button class="btn" id="startBtn">啟動</button>
     </div>
 </div>
 
@@ -75,6 +74,7 @@ const FRICTION = 0.05;
 const GRAVITY = 0.52; 
 const JUMP_FORCE = -14.2; 
 
+// 初始位置
 let player = { x: 200, y: 0, vy: 0, jumped: false };
 let obstacles = [];
 let coins = [];
@@ -82,7 +82,10 @@ let bgX = 0;
 let distanceCounter = 0;
 let isPressingGo = false;
 
-// 音訊
+// 馬路佔比調整 (由 0.7 降至 0.85，代表馬路從畫面 85% 位置開始，厚度只剩 15%)
+const ROAD_Y_RATIO = 0.85;
+
+// 音訊系統
 let audioCtx = null;
 let musicTimer = null;
 let melodyStep = 0;
@@ -114,20 +117,15 @@ function loopBGM() {
     musicTimer = setTimeout(loopBGM, tempo);
 }
 
-// 請求進入全螢幕模式
 function toggleFullScreen() {
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-        }
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
     }
 }
 
 const lBtn = document.getElementById('leftBtn');
 const rBtn = document.getElementById('rightBtn');
-
 lBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isPressingGo = true; });
 lBtn.addEventListener('touchend', () => { isPressingGo = false; });
 rBtn.addEventListener('touchstart', (e) => {
@@ -141,41 +139,41 @@ rBtn.addEventListener('touchstart', (e) => {
 
 startBtn.onclick = () => {
     initAudio();
-    toggleFullScreen(); // 觸發全螢幕
-    if (musicTimer) clearTimeout(musicTimer);
+    toggleFullScreen();
     score = 0; scoreEl.innerText = '0';
     obstacles = []; coins = []; currentSpeed = 0; melodyStep = 0;
     gameState = 'PLAYING';
     overlay.style.display = 'none';
-    setTimeout(() => { resize(); loopBGM(); }, 300); // 延遲確保全螢幕轉換完成
+    setTimeout(() => { resize(); loopBGM(); }, 300);
 };
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    player.y = canvas.height * 0.7 - 50;
+    player.y = canvas.height * ROAD_Y_RATIO - 50;
 }
 window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 300));
 resize();
 
 function update() {
     if (gameState !== 'PLAYING') return;
     if (isPressingGo) currentSpeed = Math.min(MAX_SPEED, currentSpeed + ACCEL);
     else currentSpeed = Math.max(0, currentSpeed - FRICTION);
+    
     bgX -= currentSpeed;
     distanceCounter += currentSpeed;
     if (bgX <= -canvas.width) bgX = 0;
+    
     player.vy += GRAVITY;
     player.y += player.vy;
-    let groundY = canvas.height * 0.7 - 50;
+    let groundY = canvas.height * ROAD_Y_RATIO - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
 
     if (distanceCounter > 450) { 
         const isCar = Math.random() > 0.4;
-        obstacles.push({ x: canvas.width + 100, y: canvas.height * 0.7 - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
+        obstacles.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
         if (Math.random() < 0.6) {
-            let coinHeight = canvas.height * 0.7 - 160;
+            let coinHeight = canvas.height * ROAD_Y_RATIO - 140;
             coins.push({ x: canvas.width + 250, y: coinHeight });
             coins.push({ x: canvas.width + 310, y: coinHeight });
         }
@@ -208,35 +206,45 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // 遠山
+    // 背景山脈 (配合新路面比例)
     ctx.fillStyle = '#2E7D32';
     for(let i=0; i<3; i++) {
         let x = (bgX * 0.4 % canvas.width) + i * canvas.width;
-        ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height*0.7); ctx.lineTo(x - canvas.width/2, canvas.height*0.4); ctx.lineTo(x, canvas.height*0.7); ctx.fill();
+        ctx.beginPath(); 
+        ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); 
+        ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); // 山頂高度調整
+        ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); 
+        ctx.fill();
     }
-    // 馬路
-    ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height*0.7, canvas.width, canvas.height*0.3);
+    
+    // 馬路 (大幅減小高度)
+    ctx.fillStyle = '#444'; 
+    ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
+    
+    // 路面標線
     ctx.fillStyle = '#fff';
-    for(let i=0; i<10; i++) {
-        let lineX = (bgX * 2.2 % 300) + i * 300;
-        ctx.fillRect(lineX, canvas.height * 0.82, 55, 6);
+    for(let i=0; i<15; i++) {
+        let lineX = (bgX * 2.2 % 200) + i * 200;
+        ctx.fillRect(lineX, canvas.height * (ROAD_Y_RATIO + 0.06), 40, 4);
     }
+    
     // 角色
     ctx.save();
     ctx.translate(player.x + 25, player.y + 25);
     ctx.scale(-1, 1);
-    ctx.font = '55px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🚴', 0, 0);
     ctx.restore();
+    
     // 障礙物與金幣
     obstacles.forEach(o => {
         if(o.type === 'car') {
-            ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 85, 45);
-            ctx.fillStyle = '#212121'; ctx.beginPath(); ctx.arc(o.x+20, o.y+55, 12, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(o.x+65, o.y+55, 12, 0, Math.PI*2); ctx.fill();
-        } else { ctx.font = '45px Arial'; ctx.fillText('🍌', o.x + 20, o.y + 35); }
+            ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 80, 40);
+            ctx.fillStyle = '#212121'; ctx.beginPath(); ctx.arc(o.x+20, o.y+50, 10, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(o.x+60, o.y+50, 10, 0, Math.PI*2); ctx.fill();
+        } else { ctx.font = '40px Arial'; ctx.fillText('🍌', o.x + 20, o.y + 35); }
     });
-    coins.forEach(c => { ctx.font = '42px Arial'; ctx.fillText('🪙', c.x, c.y + 25); });
+    coins.forEach(c => { ctx.font = '38px Arial'; ctx.fillText('🪙', c.x, c.y + 25); });
 
     update();
     requestAnimationFrame(draw);
