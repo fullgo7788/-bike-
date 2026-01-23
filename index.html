@@ -8,16 +8,25 @@
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; height: -webkit-fill-available; }
         canvas { display: block; width: 100%; height: 100%; }
-        #ui { position: absolute; top: 15px; left: 20px; color: #000; font-weight: 900; font-size: 18px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
-        .stat-row { margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
-        #power-ui { position: absolute; top: 15px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
+        
+        /* 頂部橫向狀態欄 */
+        #ui { 
+            position: absolute; top: 0; left: 0; width: 100%; 
+            display: flex; justify-content: space-around; align-items: center; 
+            padding: 10px 0; background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px); color: #000; font-weight: 900; 
+            font-size: 16px; text-shadow: 1px 1px 0 #fff; z-index: 100; pointer-events: none; 
+        }
+        .stat-item { display: flex; align-items: center; gap: 4px; }
+        #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
+        
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
-        .side-left { display: flex; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
         .action-btn { width: 45px; height: 45px; background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #fff; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
         #leftBtn { width: 85px; height: 85px; font-size: 38px; }
         #fireBtn { background: rgba(211, 47, 47, 0.4); border-color: #ff8a80; opacity: 0.5; }
         #fireBtn.active { background: rgba(211, 47, 47, 0.9); opacity: 1; box-shadow: 0 0 10px #ff0000; }
+        
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 280px; }
         .btn { display: inline-block; padding: 18px 45px; background: #FFD600; color: #000; border-radius: 50px; font-weight: bold; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 6px 0 #A68B00; }
@@ -26,10 +35,10 @@
 <body>
 
 <div id="ui">
-    <div class="stat-row">關卡: <span id="levelText">1</span></div>
-    <div class="stat-row">生命: <span id="livesText">👤👤👤</span></div>
-    <div class="stat-row">血量: <span id="hpText" style="color: #e91e63;">❤️❤️❤️❤️❤️</span></div>
-    <div class="stat-row">分數: <span id="score">0</span> / 2000</div>
+    <div class="stat-item">LV: <span id="levelText">1</span></div>
+    <div class="stat-item">LIFE: <span id="livesText">👤👤👤</span></div>
+    <div class="stat-item">HP: <span id="hpText" style="color: #e91e63;">❤️❤️❤️❤️❤️</span></div>
+    <div class="stat-item">SCORE: <span id="score">0</span></div>
 </div>
 <div id="power-ui"><span id="timer">20</span>s 🔥</div>
 
@@ -43,8 +52,8 @@
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="endStatus" style="display:none; margin-top:0;">遊戲結束</h2>
-        <button class="btn" id="startBtn">開始遊戲</button>
+        <h2 id="endStatus" style="display:none; margin-top:0;">GAME OVER</h2>
+        <button class="btn" id="startBtn">START</button>
     </div>
 </div>
 
@@ -69,7 +78,7 @@ let score = 0;
 let hp = 5;
 let lives = 3;
 let level = 1;
-let speedOffset = 0; // 關卡速度加成
+let speedOffset = 0;
 let invincibleFrame = 0;
 
 let currentSpeed = 0;
@@ -172,7 +181,6 @@ resize();
 function update() {
     if (gameState !== 'PLAYING') return;
     
-    // 速度計算 (包含關卡加成)
     const maxS = MAX_SPEED_BASE + speedOffset;
     if (isPressingGo) currentSpeed = Math.min(maxS, currentSpeed + ACCEL);
     else currentSpeed = Math.max(0, currentSpeed - FRICTION);
@@ -195,35 +203,23 @@ function update() {
 
     if (invincibleFrame > 0) invincibleFrame--;
 
-    // 關卡晉升邏輯
     if (score >= 2000) {
-        score = 0;
-        level++;
-        lives++;
-        speedOffset += 0.3;
-        playSound(1000, 0.5, 0.2, 'sine'); // 升級音效
+        score = 0; level++; lives++; speedOffset += 0.3;
+        playSound(1000, 0.5, 0.2, 'sine');
         updateUI();
     }
 
-    // 生成物
     if (distanceCounter > (450 - speedOffset * 10)) { 
         const rand = Math.random();
-        if (rand < 0.05) { // 5% 出現愛心
-            coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'heart' });
-        } else if (rand < 0.2) { // 15% 紅色金幣
-            coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'red' });
-        } else if (rand < 0.7) { // 50% 普通金幣
-            coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'gold' });
-        }
+        if (rand < 0.05) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'heart' });
+        else if (rand < 0.2) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'red' });
+        else if (rand < 0.7) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'gold' });
         
-        // 生成障礙物
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 250, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
-        
         distanceCounter = 0;
     }
 
-    // 子彈碰撞
     bullets.forEach((b, bi) => {
         b.x += 12;
         obstacles.forEach((o, oi) => {
@@ -235,19 +231,16 @@ function update() {
         });
     });
 
-    // 障礙物碰撞
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
         if (invincibleFrame === 0 && Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
-            hp--;
-            invincibleFrame = 90;
+            hp--; invincibleFrame = 90;
             playSound(150, 0.3, 0.15, 'sawtooth');
             if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; endStatus.style.display = 'block'; overlay.style.display = 'flex'; } }
             updateUI();
         }
     });
 
-    // 物品收集
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
