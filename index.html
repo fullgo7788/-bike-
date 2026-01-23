@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 V5 - 音樂強化版</title>
+    <title>輪胎英雄 V7 - 音樂倍增版</title>
     <style>
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; }
         canvas { display: block; }
         #ui { position: absolute; top: 15px; left: 15px; color: #000; font-weight: 900; font-size: 20px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
-        
         #controls {
             position: absolute; bottom: 50px; left: 0; width: 100%;
             display: flex; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 150;
@@ -21,7 +20,6 @@
             backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent;
         }
         .ctrl-btn:active { background: rgba(255,255,255,0.3); }
-        
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 280px; }
         .btn { display: inline-block; padding: 18px 45px; background: #FFD600; color: #000; border-radius: 50px; font-weight: bold; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 6px 0 #A68B00; }
@@ -35,13 +33,15 @@
 </div>
 
 <div id="controls">
-    <div class="ctrl-btn" id="leftBtn">▶</div> <div class="ctrl-btn" id="rightBtn">▲</div> </div>
+    <div class="ctrl-btn" id="leftBtn">▶</div> 
+    <div class="ctrl-btn" id="rightBtn">▲</div> 
+</div>
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="msg-title">輪胎英雄 V5</h2>
-        <p style="font-weight: bold; color: #333;">音樂已就緒！<br>左鍵加速，右鍵跳躍</p>
-        <button class="btn" id="startBtn">進入遊戲</button>
+        <h2 id="msg-title">輪胎英雄 V7</h2>
+        <p style="font-weight: bold; color: #333;">音樂聲量已翻倍！<br>音效維持原樣。</p>
+        <button class="btn" id="startBtn">開始挑戰</button>
     </div>
 </div>
 
@@ -60,7 +60,6 @@ let score = 0;
 let highScore = localStorage.getItem('bicycleHighScore') || 0;
 highScoreEl.innerText = highScore;
 
-// 物理參數 (已減慢 0.3 的跳躍感)
 let currentSpeed = 0;
 const MAX_SPEED = 6.2;
 const ACCEL = 0.16;
@@ -75,12 +74,10 @@ let bgX = 0;
 let distanceCounter = 0;
 let isPressingGo = false;
 
-// --- 背景音樂系統 (核心更新) ---
+// --- 背景音樂與音效系統 ---
 let audioCtx = null;
 let musicTimer = null;
 let melodyStep = 0;
-
-// 快樂的循環旋律
 const MELODY = [262, 330, 392, 523, 392, 330, 262, 0, 440, 440, 392, 0];
 
 function initAudio() {
@@ -100,18 +97,16 @@ function playSound(freq, dur, vol, type = 'sine') {
     osc.start(); osc.stop(audioCtx.currentTime + dur);
 }
 
-// 循環音樂函式
 function loopBGM() {
     if (gameState !== 'PLAYING') return;
     let freq = MELODY[melodyStep % MELODY.length];
-    playSound(freq, 0.25, 0.03, 'triangle'); // 使用較溫和的三角波作為背景音樂
+    // 音樂音量獨立翻倍至 0.12 (相較於最初的 0.03 已增大 4 倍，相較 V6 增大 2 倍)
+    playSound(freq, 0.25, 0.12, 'triangle'); 
     melodyStep++;
-    // 音樂速度隨玩家速度變化
     let tempo = Math.max(160, 350 - currentSpeed * 25);
     musicTimer = setTimeout(loopBGM, tempo);
 }
 
-// 操作事件
 const lBtn = document.getElementById('leftBtn');
 const rBtn = document.getElementById('rightBtn');
 
@@ -122,7 +117,8 @@ rBtn.addEventListener('touchstart', (e) => {
     if (!player.jumped && gameState === 'PLAYING') {
         player.vy = JUMP_FORCE;
         player.jumped = true;
-        playSound(880, 0.15, 0.08, 'sine'); // 跳躍音效
+        // 音效維持原本適中的音量 0.08
+        playSound(880, 0.15, 0.08, 'sine'); 
     }
 });
 
@@ -133,7 +129,7 @@ startBtn.onclick = () => {
     obstacles = []; coins = []; currentSpeed = 0; melodyStep = 0;
     gameState = 'PLAYING';
     overlay.style.display = 'none';
-    loopBGM(); // 啟動背景音樂
+    loopBGM();
 };
 
 function resize() {
@@ -146,44 +142,39 @@ resize();
 
 function update() {
     if (gameState !== 'PLAYING') return;
-    
     if (isPressingGo) currentSpeed = Math.min(MAX_SPEED, currentSpeed + ACCEL);
     else currentSpeed = Math.max(0, currentSpeed - FRICTION);
-
     bgX -= currentSpeed;
     distanceCounter += currentSpeed;
     if (bgX <= -canvas.width) bgX = 0;
-
     player.vy += GRAVITY;
     player.y += player.vy;
     let groundY = canvas.height * 0.7 - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
-
     if (distanceCounter > 450) { 
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 100, y: canvas.height * 0.7 - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
         distanceCounter = 0;
     }
-
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
         if (Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
             gameState = 'OVER';
             overlay.style.display = 'flex';
-            playSound(150, 0.6, 0.15, 'sawtooth'); // 撞車音效
+            // 音效音量維持原樣 0.15
+            playSound(150, 0.6, 0.15, 'sawtooth'); 
         }
     });
-
     if (Math.random() < 0.02) coins.push({ x: canvas.width + 50, y: canvas.height * 0.7 - 160 });
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
             score += 10; scoreEl.innerText = score;
-            playSound(1200, 0.1, 0.05, 'sine'); // 金幣音效
+            // 音效音量維持原樣 0.05
+            playSound(1200, 0.1, 0.05, 'sine'); 
             coins.splice(i, 1);
         }
     });
-
     obstacles = obstacles.filter(o => o.x > -200);
     coins = coins.filter(c => c.x > -100);
 }
@@ -191,31 +182,23 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 遠山
     ctx.fillStyle = '#2E7D32';
     for(let i=0; i<3; i++) {
         let x = (bgX * 0.4 % canvas.width) + i * canvas.width;
         ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height*0.7); ctx.lineTo(x - canvas.width/2, canvas.height*0.4); ctx.lineTo(x, canvas.height*0.7); ctx.fill();
     }
-
-    // 馬路
     ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height*0.7, canvas.width, canvas.height*0.3);
     ctx.fillStyle = '#fff';
     for(let i=0; i<10; i++) {
         let lineX = (bgX * 2.2 % 300) + i * 300;
         ctx.fillRect(lineX, canvas.height * 0.82, 55, 6);
     }
-
-    // 自行車英雄
     ctx.save();
     ctx.translate(player.x + 25, player.y + 25);
     ctx.scale(-1, 1);
     ctx.font = '55px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🚴', 0, 0);
     ctx.restore();
-
-    // 障礙物與金幣
     obstacles.forEach(o => {
         if(o.type === 'car') {
             ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 85, 45);
@@ -224,7 +207,6 @@ function draw() {
         } else { ctx.font = '45px Arial'; ctx.fillText('🍌', o.x + 20, o.y + 35); }
     });
     coins.forEach(c => { ctx.font = '42px Arial'; ctx.fillText('🪙', c.x, c.y + 25); });
-
     update();
     requestAnimationFrame(draw);
 }
