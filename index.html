@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 V12 - 雙鍵版</title>
+    <title>輪胎英雄 V13 - 操控優化</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; height: -webkit-fill-available; }
@@ -11,14 +11,26 @@
         #ui { position: absolute; top: 15px; left: 20px; color: #000; font-weight: 900; font-size: 20px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
         #power-ui { position: absolute; top: 15px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
         
-        /* 控制面板 */
-        #controls { position: absolute; bottom: 20px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
+        /* 控制面板佈局 */
+        #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
+        
         .side-left { display: flex; align-items: flex-end; }
-        .side-right { display: flex; flex-direction: column; gap: 15px; align-items: center; }
+        .side-right { display: flex; gap: 20px; align-items: flex-end; }
 
-        .ctrl-btn { width: 80px; height: 80px; background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; color: #fff; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
+        /* 左手加速鍵維持原大小 */
+        #leftBtn { width: 85px; height: 85px; font-size: 38px; }
+
+        /* 右手功能鍵縮小一半 (約 45px) */
+        .action-btn { 
+            width: 45px; height: 45px; background: rgba(0,0,0,0.7); 
+            border: 2px solid #fff; border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 20px; color: #fff; backdrop-filter: blur(5px); 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        
         #fireBtn { background: rgba(211, 47, 47, 0.4); border-color: #ff8a80; opacity: 0.5; }
-        #fireBtn.active { background: rgba(211, 47, 47, 0.9); opacity: 1; box-shadow: 0 0 15px #ff0000; }
+        #fireBtn.active { background: rgba(211, 47, 47, 0.9); opacity: 1; box-shadow: 0 0 10px #ff0000; }
         
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 320px; }
@@ -36,18 +48,18 @@
 
 <div id="controls">
     <div class="side-left">
-        <div class="ctrl-btn" id="leftBtn">▶</div> 
+        <div class="action-btn" id="leftBtn" style="width:85px; height:85px; font-size:38px;">▶</div> 
     </div>
     <div class="side-right">
-        <div class="ctrl-btn" id="jumpBtn">▲</div> 
-        <div class="ctrl-btn" id="fireBtn">🔥</div> 
+        <div class="action-btn" id="fireBtn">🔥</div> 
+        <div class="action-btn" id="jumpBtn">▲</div> 
     </div>
 </div>
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="msg-title">輪胎英雄 V12</h2>
-        <p style="font-weight: bold; color: #333;">操控升級：<br>右上方跳躍，右下方發射！</p>
+        <h2 id="msg-title">輪胎英雄 V13</h2>
+        <p style="font-weight: bold; color: #333;">按鈕已縮小並重新佈局<br>🔥 在左 | ▲ 在右</p>
         <button class="btn" id="startBtn">啟動</button>
     </div>
 </div>
@@ -86,7 +98,7 @@ let bgX = 0;
 let distanceCounter = 0;
 let isPressingGo = false;
 
-// 音訊
+// 音訊系統
 let audioCtx = null;
 let musicTimer = null;
 let melodyStep = 0;
@@ -125,14 +137,12 @@ function toggleFullScreen() {
     }
 }
 
-// 分開的按鈕事件
 const lBtn = document.getElementById('leftBtn');
 const jBtn = document.getElementById('jumpBtn');
 const fBtn = document.getElementById('fireBtn');
 
 lBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isPressingGo = true; });
 lBtn.addEventListener('touchend', () => { isPressingGo = false; });
-
 jBtn.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     if (!player.jumped && gameState === 'PLAYING') {
@@ -141,7 +151,6 @@ jBtn.addEventListener('touchstart', (e) => {
         playSound(880, 0.15, 0.08, 'sine');
     }
 });
-
 fBtn.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     if (player.powerTime > 0 && gameState === 'PLAYING') {
@@ -185,7 +194,6 @@ function update() {
     let groundY = canvas.height * ROAD_Y_RATIO - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
 
-    // 威力模式與按鈕視覺反饋
     if (player.powerTime > 0) {
         player.powerTime -= 1/60;
         powerUi.style.display = 'block';
@@ -201,7 +209,7 @@ function update() {
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
         if (Math.random() < 0.6) {
-            let isRed = Math.random() < 0.15; // 下修紅色金幣出現率，使其更珍貴
+            let isRed = Math.random() < 0.15;
             let coinHeight = canvas.height * ROAD_Y_RATIO - 140;
             coins.push({ x: canvas.width + 250, y: coinHeight, type: isRed ? 'red' : 'gold' });
             if (!isRed) coins.push({ x: canvas.width + 310, y: coinHeight, type: 'gold' });
@@ -210,7 +218,7 @@ function update() {
     }
 
     bullets.forEach((b, bi) => {
-        b.x += 12; // 子彈飛行稍快一點
+        b.x += 12;
         obstacles.forEach((o, oi) => {
             if (Math.abs(b.x - o.x) < 50 && Math.abs(b.y - o.y) < 50) {
                 obstacles.splice(oi, 1);
@@ -233,13 +241,8 @@ function update() {
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
-            if (c.type === 'red') {
-                player.powerTime = 20;
-                playSound(1500, 0.2, 0.1, 'sine');
-            } else {
-                score += 10; scoreEl.innerText = score;
-                playSound(1200, 0.1, 0.05, 'sine'); 
-            }
+            if (c.type === 'red') { player.powerTime = 20; playSound(1500, 0.2, 0.1, 'sine'); }
+            else { score += 10; scoreEl.innerText = score; playSound(1200, 0.1, 0.05, 'sine'); }
             coins.splice(i, 1);
         }
     });
@@ -253,38 +256,24 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // 背景
     ctx.fillStyle = '#2E7D32';
     for(let i=0; i<3; i++) {
         let x = (bgX * 0.4 % canvas.width) + i * canvas.width;
-        ctx.beginPath(); 
-        ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); 
-        ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); 
-        ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); 
-        ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); ctx.fill();
     }
     
-    // 馬路
-    ctx.fillStyle = '#444'; 
-    ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
+    ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
     
-    // 角色
     ctx.save();
     ctx.translate(player.x + 25, player.y + 25);
-    if (player.powerTime > 0) {
-        ctx.shadowBlur = 20; ctx.shadowColor = "red";
-    }
+    if (player.powerTime > 0) { ctx.shadowBlur = 20; ctx.shadowColor = "red"; }
     ctx.scale(-1, 1);
     ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🚴', 0, 0);
     ctx.restore();
     
-    // 子彈
-    bullets.forEach(b => {
-        ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y);
-    });
+    bullets.forEach(b => { ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y); });
     
-    // 障礙物與金幣
     obstacles.forEach(o => {
         if(o.type === 'car') {
             ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 80, 40);
@@ -296,11 +285,8 @@ function draw() {
     coins.forEach(c => { 
         if(c.type === 'red') {
             ctx.font = '45px Arial'; ctx.shadowBlur = 10; ctx.shadowColor = "red";
-            ctx.fillText('🔴', c.x, c.y + 25);
-            ctx.shadowBlur = 0;
-        } else {
-            ctx.font = '38px Arial'; ctx.fillText('🪙', c.x, c.y + 25);
-        }
+            ctx.fillText('🔴', c.x, c.y + 25); ctx.shadowBlur = 0;
+        } else { ctx.font = '38px Arial'; ctx.fillText('🪙', c.x, c.y + 25); }
     });
 
     update();
