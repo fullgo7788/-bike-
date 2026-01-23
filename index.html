@@ -70,38 +70,17 @@ const fireBtn = document.getElementById('fireBtn');
 const endStatus = document.getElementById('endStatus');
 
 let gameState = 'START'; 
-let score = 0;
-let hp = 5;
-let lives = 3;
-let level = 1;
-let speedOffset = 0;
-let invincibleFrame = 0;
-
+let score = 0, hp = 5, lives = 3, level = 1, speedOffset = 0, invincibleFrame = 0;
 let currentSpeed = 0;
-const MAX_SPEED_BASE = 6.2;
-const ACCEL = 0.16;
-const FRICTION = 0.05;
-const GRAVITY = 0.52; 
-const JUMP_FORCE = -14.2; 
-const ROAD_Y_RATIO = 0.85;
+const MAX_SPEED_BASE = 6.2, ACCEL = 0.16, FRICTION = 0.05, GRAVITY = 0.52, JUMP_FORCE = -14.2, ROAD_Y_RATIO = 0.85;
 
 let player = { x: 200, y: 0, vy: 0, jumped: false, powerTime: 0 };
-let obstacles = [];
-let coins = [];
-let bullets = [];
-let bgX = 0;
-let distanceCounter = 0;
-let isPressingGo = false;
+let obstacles = [], coins = [], bullets = [];
+let bgX = 0, distanceCounter = 0, isPressingGo = false;
 
-let audioCtx = null;
-let musicTimer = null;
-let melodyStep = 0;
-const MELODIES = [
-    [262, 330, 392, 523, 392, 330, 262, 0], 
-    [293, 349, 440, 587, 440, 349, 293, 0], 
-    [329, 392, 493, 659, 329, 392, 493, 0], 
-    [262, 392, 262, 440, 262, 349, 262, 330] 
-];
+// 音樂旋律
+let audioCtx = null, musicTimer = null, melodyStep = 0;
+const MELODIES = [[262, 330, 392, 523, 392, 330, 262, 0], [293, 349, 440, 587, 440, 349, 293, 0], [329, 392, 493, 659, 329, 392, 493, 0], [262, 392, 262, 440, 262, 349, 262, 330]];
 const WAVEFORMS = ['triangle', 'square', 'sine', 'sawtooth'];
 
 function initAudio() {
@@ -124,13 +103,10 @@ function playSound(freq, dur, vol, type = 'sine') {
 function loopBGM() {
     if (gameState !== 'PLAYING') return;
     let mIdx = (level - 1) % MELODIES.length;
-    let melody = MELODIES[mIdx];
-    let wave = WAVEFORMS[mIdx];
-    let freq = melody[melodyStep % melody.length];
-    playSound(freq, 0.25, 0.08, wave); 
+    let freq = MELODIES[mIdx][melodyStep % 8];
+    playSound(freq, 0.25, 0.06, WAVEFORMS[mIdx]); 
     melodyStep++;
-    let tempo = Math.max(140, 320 - (currentSpeed * 20));
-    musicTimer = setTimeout(loopBGM, tempo);
+    musicTimer = setTimeout(loopBGM, Math.max(140, 320 - (currentSpeed * 20)));
 }
 
 function updateUI() {
@@ -140,32 +116,8 @@ function updateUI() {
     scoreEl.innerText = score;
 }
 
-function toggleFullScreen() {
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-        else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
-    }
-}
-
-document.getElementById('leftBtn').ontouchstart = (e) => { e.preventDefault(); isPressingGo = true; };
-document.getElementById('leftBtn').ontouchend = () => { isPressingGo = false; };
-document.getElementById('jumpBtn').ontouchstart = (e) => { 
-    e.preventDefault(); 
-    if (!player.jumped && gameState === 'PLAYING') {
-        player.vy = JUMP_FORCE; player.jumped = true;
-        playSound(880, 0.15, 0.08, 'sine');
-    }
-};
-document.getElementById('fireBtn').ontouchstart = (e) => { 
-    e.preventDefault(); 
-    if (player.powerTime > 0 && gameState === 'PLAYING') {
-        bullets.push({ x: player.x + 50, y: player.y + 20 });
-        playSound(600, 0.1, 0.1, 'square');
-    }
-};
-
 startBtn.onclick = () => {
-    initAudio(); toggleFullScreen();
+    initAudio(); 
     score = 0; hp = 5; lives = 3; level = 1; speedOffset = 0;
     obstacles = []; coins = []; bullets = []; player.powerTime = 0;
     currentSpeed = 0; melodyStep = 0;
@@ -173,7 +125,7 @@ startBtn.onclick = () => {
     overlay.style.display = 'none';
     updateUI();
     clearTimeout(musicTimer);
-    setTimeout(() => { resize(); loopBGM(); }, 300);
+    resize(); loopBGM();
 };
 
 function resize() {
@@ -182,21 +134,20 @@ function resize() {
     player.y = canvas.height * ROAD_Y_RATIO - 50;
 }
 window.addEventListener('resize', resize);
-resize();
 
 function update() {
     if (gameState !== 'PLAYING') return;
     const maxS = MAX_SPEED_BASE + speedOffset;
-    if (isPressingGo) currentSpeed = Math.min(maxS, currentSpeed + ACCEL);
-    else currentSpeed = Math.max(0, currentSpeed - FRICTION);
-    bgX -= currentSpeed;
+    currentSpeed = isPressingGo ? Math.min(maxS, currentSpeed + ACCEL) : Math.max(0, currentSpeed - FRICTION);
+    bgX = (bgX - currentSpeed) % canvas.width;
     distanceCounter += currentSpeed;
-    if (bgX <= -canvas.width) bgX = 0;
+    
     player.vy += GRAVITY; player.y += player.vy;
     let groundY = canvas.height * ROAD_Y_RATIO - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
+    
     if (player.powerTime > 0) {
-        player.powerTime -= 1/60;
+        player.powerTime -= 0.016;
         powerUi.style.display = 'block';
         timerEl.innerText = Math.ceil(player.powerTime);
         fireBtn.classList.add('active');
@@ -204,88 +155,114 @@ function update() {
     }
     if (invincibleFrame > 0) invincibleFrame--;
 
-    // 晉級門檻改為 2500
-    if (score >= 2500) {
-        score = 0; level++; lives++; speedOffset += 0.3;
-        playSound(1200, 0.4, 0.15, 'sine');
-        updateUI();
-    }
+    if (score >= 2500) { score = 0; level++; lives++; speedOffset += 0.3; updateUI(); playSound(1200, 0.4, 0.1, 'sine'); }
 
-    if (distanceCounter > (450 - speedOffset * 10)) { 
-        const rand = Math.random();
-        if (rand < 0.05) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'heart' });
-        else if (rand < 0.15) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'red' });
-        else if (rand < 0.6) coins.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 140, type: 'gold' });
+    // 生成物件：增加金幣量，優化生成邏輯
+    if (distanceCounter > (400 - speedOffset * 10)) { 
+        // 批次生成 3 倍金幣 (原本 1 個，現在生成一組)
+        for(let i=0; i<3; i++) {
+            let type = 'gold';
+            let r = Math.random();
+            if (i === 0 && r < 0.05) type = 'heart';
+            else if (i === 1 && r < 0.15) type = 'red';
+            coins.push({ x: canvas.width + 100 + (i*40), y: canvas.height * ROAD_Y_RATIO - 140, type: type });
+        }
+        
         const isCar = Math.random() > 0.4;
-        obstacles.push({ x: canvas.width + 250, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
+        obstacles.push({ x: canvas.width + 300, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
         distanceCounter = 0;
     }
+
+    // 碰撞偵測 (金幣與障礙物分開處理以優化效能)
+    for (let i = coins.length - 1; i >= 0; i--) {
+        let c = coins[i];
+        c.x -= currentSpeed;
+        if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
+            if (c.type === 'heart') hp = 5;
+            else if (c.type === 'red') player.powerTime = 20;
+            else score += 10;
+            coins.splice(i, 1);
+            updateUI();
+        } else if (c.x < -50) coins.splice(i, 1);
+    }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let o = obstacles[i];
+        o.x -= o.speed;
+        if (invincibleFrame === 0 && Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
+            hp--; invincibleFrame = 90;
+            if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; endStatus.style.display = 'block'; overlay.style.display = 'flex'; } }
+            updateUI();
+        } else if (o.x < -100) obstacles.splice(i, 1);
+    }
+
     bullets.forEach((b, bi) => {
         b.x += 12;
         obstacles.forEach((o, oi) => {
             if (Math.abs(b.x - o.x) < 50 && Math.abs(b.y - o.y) < 50) {
                 obstacles.splice(oi, 1); bullets.splice(bi, 1);
                 score += 50; updateUI();
-                playSound(200, 0.2, 0.15, 'sawtooth');
             }
         });
     });
-    obstacles.forEach((o, i) => {
-        o.x -= o.speed;
-        if (invincibleFrame === 0 && Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
-            hp--; invincibleFrame = 90;
-            playSound(100, 0.3, 0.1, 'sawtooth');
-            if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; endStatus.style.display = 'block'; overlay.style.display = 'flex'; } }
-            updateUI();
-        }
-    });
-    coins.forEach((c, i) => {
-        c.x -= currentSpeed;
-        if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
-            if (c.type === 'heart') { hp = 5; playSound(1800, 0.3, 0.1, 'sine'); }
-            else if (c.type === 'red') { player.powerTime = 20; playSound(1500, 0.2, 0.1, 'sine'); }
-            else { score += 10; playSound(1200, 0.1, 0.05, 'sine'); }
-            coins.splice(i, 1);
-            updateUI();
-        }
-    });
-    obstacles = obstacles.filter(o => o.x > -200);
-    coins = coins.filter(c => c.x > -100);
-    bullets = bullets.filter(b => b.x < canvas.width + 100);
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 背景
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#2E7D32';
-    for(let i=0; i<3; i++) {
-        let x = (bgX * 0.4 % canvas.width) + i * canvas.width;
-        ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); ctx.fill();
+    let mountainX = (bgX * 0.4) % canvas.width;
+    for(let i=0; i<2; i++) {
+        let x = mountainX + i * canvas.width;
+        ctx.beginPath(); ctx.moveTo(x, canvas.height * ROAD_Y_RATIO); ctx.lineTo(x + canvas.width/2, canvas.height * 0.3); ctx.lineTo(x + canvas.width, canvas.height * ROAD_Y_RATIO); ctx.fill();
     }
-    ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
+    // 道路
+    ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height);
+    
+    // 玩家 (關閉陰影優化效能)
     if (invincibleFrame % 10 < 5) {
+        ctx.font = '50px Arial';
         ctx.save();
         ctx.translate(player.x + 25, player.y + 25);
-        if (player.powerTime > 0) { ctx.shadowBlur = 20; ctx.shadowColor = "red"; }
-        ctx.scale(-1, 1); ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('🚴', 0, 0);
+        if (player.powerTime > 0) { // 僅在強力狀態使用簡單發光
+            ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.strokeRect(-25, -25, 50, 50);
+        }
+        ctx.scale(-1, 1); ctx.fillText('🚴', 0, 0);
         ctx.restore();
     }
+    
+    // 障礙物與金幣 (直接繪製，不使用 shadowBlur)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     bullets.forEach(b => { ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y); });
+    
     obstacles.forEach(o => {
         if(o.type === 'car') {
             ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 80, 40);
-            ctx.fillStyle = '#212121'; ctx.beginPath(); ctx.arc(o.x+20, o.y+50, 10, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(o.x+65, o.y+50, 10, 0, Math.PI*2); ctx.fill();
-        } else { ctx.font = '40px Arial'; ctx.fillText('🍌', o.x + 20, o.y + 35); }
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(o.x+20, o.y+50, 8, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(o.x+60, o.y+50, 8, 0, 7); ctx.fill();
+        } else { ctx.font = '40px Arial'; ctx.fillText('🍌', o.x + 40, o.y + 30); }
     });
+
     coins.forEach(c => { 
-        if(c.type === 'heart') { ctx.font = '45px Arial'; ctx.fillText('💖', c.x, c.y + 25); }
-        else if(c.type === 'red') { ctx.font = '45px Arial'; ctx.shadowBlur = 10; ctx.shadowColor = "red"; ctx.fillText('🔴', c.x, c.y + 25); ctx.shadowBlur = 0; }
-        else { ctx.font = '38px Arial'; ctx.fillText('🪙', c.x, c.y + 25); }
+        if(c.type === 'heart') { ctx.font = '40px Arial'; ctx.fillText('💖', c.x, c.y); }
+        else if(c.type === 'red') { ctx.font = '40px Arial'; ctx.fillText('🔴', c.x, c.y); }
+        else { ctx.font = '30px Arial'; ctx.fillText('🪙', c.x, c.y); }
     });
+
     update(); requestAnimationFrame(draw);
 }
+
+// 控制器
+document.getElementById('leftBtn').ontouchstart = (e) => { e.preventDefault(); isPressingGo = true; };
+document.getElementById('leftBtn').ontouchend = () => { isPressingGo = false; };
+document.getElementById('jumpBtn').ontouchstart = (e) => { 
+    e.preventDefault(); if (!player.jumped && gameState === 'PLAYING') { player.vy = JUMP_FORCE; player.jumped = true; playSound(880, 0.1, 0.05); }
+};
+document.getElementById('fireBtn').ontouchstart = (e) => { 
+    e.preventDefault(); if (player.powerTime > 0 && gameState === 'PLAYING') bullets.push({ x: player.x + 50, y: player.y + 20 });
+};
+
+resize();
 draw();
 </script>
 </body>
