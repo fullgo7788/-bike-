@@ -3,37 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄 V13 - 操控優化</title>
+    <title>輪胎英雄</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; height: -webkit-fill-available; }
         canvas { display: block; width: 100%; height: 100%; }
         #ui { position: absolute; top: 15px; left: 20px; color: #000; font-weight: 900; font-size: 20px; text-shadow: 2px 2px 0 #fff; z-index: 100; pointer-events: none; }
         #power-ui { position: absolute; top: 15px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
-        
-        /* 控制面板佈局 */
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
-        
         .side-left { display: flex; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
-
-        /* 左手加速鍵維持原大小 */
+        .action-btn { width: 45px; height: 45px; background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #fff; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
         #leftBtn { width: 85px; height: 85px; font-size: 38px; }
-
-        /* 右手功能鍵縮小一半 (約 45px) */
-        .action-btn { 
-            width: 45px; height: 45px; background: rgba(0,0,0,0.7); 
-            border: 2px solid #fff; border-radius: 50%; 
-            display: flex; justify-content: center; align-items: center; 
-            font-size: 20px; color: #fff; backdrop-filter: blur(5px); 
-            -webkit-tap-highlight-color: transparent; 
-        }
-        
         #fireBtn { background: rgba(211, 47, 47, 0.4); border-color: #ff8a80; opacity: 0.5; }
         #fireBtn.active { background: rgba(211, 47, 47, 0.9); opacity: 1; box-shadow: 0 0 10px #ff0000; }
-        
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
-        #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 320px; }
+        #msg-box { background: #fff; padding: 30px; border: 4px solid #000; border-radius: 20px; text-align: center; width: 280px; }
         .btn { display: inline-block; padding: 18px 45px; background: #FFD600; color: #000; border-radius: 50px; font-weight: bold; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 6px 0 #A68B00; }
     </style>
 </head>
@@ -43,12 +28,11 @@
     <div>分數: <span id="score">0</span></div>
     <div style="font-size: 14px;">最高紀錄: <span id="highScore">0</span></div>
 </div>
-
-<div id="power-ui">🔥 能量模式: <span id="timer">20</span>s</div>
+<div id="power-ui"><span id="timer">20</span>s 🔥</div>
 
 <div id="controls">
     <div class="side-left">
-        <div class="action-btn" id="leftBtn" style="width:85px; height:85px; font-size:38px;">▶</div> 
+        <div class="action-btn" id="leftBtn">▶</div> 
     </div>
     <div class="side-right">
         <div class="action-btn" id="fireBtn">🔥</div> 
@@ -58,9 +42,7 @@
 
 <div id="overlay">
     <div id="msg-box">
-        <h2 id="msg-title">輪胎英雄 V13</h2>
-        <p style="font-weight: bold; color: #333;">按鈕已縮小並重新佈局<br>🔥 在左 | ▲ 在右</p>
-        <button class="btn" id="startBtn">啟動</button>
+        <button class="btn" id="startBtn">開始遊戲</button>
     </div>
 </div>
 
@@ -98,7 +80,6 @@ let bgX = 0;
 let distanceCounter = 0;
 let isPressingGo = false;
 
-// 音訊系統
 let audioCtx = null;
 let musicTimer = null;
 let melodyStep = 0;
@@ -137,21 +118,16 @@ function toggleFullScreen() {
     }
 }
 
-const lBtn = document.getElementById('leftBtn');
-const jBtn = document.getElementById('jumpBtn');
-const fBtn = document.getElementById('fireBtn');
-
-lBtn.addEventListener('touchstart', (e) => { e.preventDefault(); isPressingGo = true; });
-lBtn.addEventListener('touchend', () => { isPressingGo = false; });
-jBtn.addEventListener('touchstart', (e) => { 
+document.getElementById('leftBtn').addEventListener('touchstart', (e) => { e.preventDefault(); isPressingGo = true; });
+document.getElementById('leftBtn').addEventListener('touchend', () => { isPressingGo = false; });
+document.getElementById('jumpBtn').addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     if (!player.jumped && gameState === 'PLAYING') {
-        player.vy = JUMP_FORCE;
-        player.jumped = true;
+        player.vy = JUMP_FORCE; player.jumped = true;
         playSound(880, 0.15, 0.08, 'sine');
     }
 });
-fBtn.addEventListener('touchstart', (e) => { 
+document.getElementById('fireBtn').addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     if (player.powerTime > 0 && gameState === 'PLAYING') {
         bullets.push({ x: player.x + 50, y: player.y + 20 });
@@ -160,8 +136,7 @@ fBtn.addEventListener('touchstart', (e) => {
 });
 
 startBtn.onclick = () => {
-    initAudio();
-    toggleFullScreen();
+    initAudio(); toggleFullScreen();
     score = 0; scoreEl.innerText = '0';
     obstacles = []; coins = []; bullets = []; player.powerTime = 0;
     currentSpeed = 0; melodyStep = 0;
@@ -181,30 +156,21 @@ resize();
 
 function update() {
     if (gameState !== 'PLAYING') return;
-    
     if (isPressingGo) currentSpeed = Math.min(MAX_SPEED, currentSpeed + ACCEL);
     else currentSpeed = Math.max(0, currentSpeed - FRICTION);
-    
     bgX -= currentSpeed;
     distanceCounter += currentSpeed;
     if (bgX <= -canvas.width) bgX = 0;
-    
-    player.vy += GRAVITY;
-    player.y += player.vy;
+    player.vy += GRAVITY; player.y += player.vy;
     let groundY = canvas.height * ROAD_Y_RATIO - 50;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumped = false; }
-
     if (player.powerTime > 0) {
         player.powerTime -= 1/60;
         powerUi.style.display = 'block';
         timerEl.innerText = Math.ceil(player.powerTime);
         fireBtn.classList.add('active');
-        if (player.powerTime <= 0) {
-            powerUi.style.display = 'none';
-            fireBtn.classList.remove('active');
-        }
+        if (player.powerTime <= 0) { powerUi.style.display = 'none'; fireBtn.classList.remove('active'); }
     }
-
     if (distanceCounter > 450) { 
         const isCar = Math.random() > 0.4;
         obstacles.push({ x: canvas.width + 100, y: canvas.height * ROAD_Y_RATIO - 60, type: isCar ? 'car' : 'banana', speed: currentSpeed + (isCar ? 2 : 0) });
@@ -216,28 +182,23 @@ function update() {
         }
         distanceCounter = 0;
     }
-
     bullets.forEach((b, bi) => {
         b.x += 12;
         obstacles.forEach((o, oi) => {
             if (Math.abs(b.x - o.x) < 50 && Math.abs(b.y - o.y) < 50) {
-                obstacles.splice(oi, 1);
-                bullets.splice(bi, 1);
+                obstacles.splice(oi, 1); bullets.splice(bi, 1);
                 score += 50; scoreEl.innerText = score;
                 playSound(200, 0.3, 0.2, 'sawtooth');
             }
         });
     });
-
     obstacles.forEach((o, i) => {
         o.x -= o.speed;
         if (Math.abs(player.x - o.x) < 42 && Math.abs(player.y - o.y) < 42) {
-            gameState = 'OVER';
-            overlay.style.display = 'flex';
+            gameState = 'OVER'; overlay.style.display = 'flex';
             playSound(150, 0.6, 0.15, 'sawtooth'); 
         }
     });
-
     coins.forEach((c, i) => {
         c.x -= currentSpeed;
         if (Math.abs(player.x - c.x) < 40 && Math.abs(player.y - c.y) < 40) {
@@ -246,7 +207,6 @@ function update() {
             coins.splice(i, 1);
         }
     });
-
     obstacles = obstacles.filter(o => o.x > -200);
     coins = coins.filter(c => c.x > -100);
     bullets = bullets.filter(b => b.x < canvas.width + 100);
@@ -255,25 +215,19 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     ctx.fillStyle = '#2E7D32';
     for(let i=0; i<3; i++) {
         let x = (bgX * 0.4 % canvas.width) + i * canvas.width;
         ctx.beginPath(); ctx.moveTo(x - canvas.width, canvas.height * ROAD_Y_RATIO); ctx.lineTo(x - canvas.width/2, canvas.height * 0.3); ctx.lineTo(x, canvas.height * ROAD_Y_RATIO); ctx.fill();
     }
-    
     ctx.fillStyle = '#444'; ctx.fillRect(0, canvas.height * ROAD_Y_RATIO, canvas.width, canvas.height * (1 - ROAD_Y_RATIO));
-    
     ctx.save();
     ctx.translate(player.x + 25, player.y + 25);
     if (player.powerTime > 0) { ctx.shadowBlur = 20; ctx.shadowColor = "red"; }
-    ctx.scale(-1, 1);
-    ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.scale(-1, 1); ctx.font = '50px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🚴', 0, 0);
     ctx.restore();
-    
     bullets.forEach(b => { ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y); });
-    
     obstacles.forEach(o => {
         if(o.type === 'car') {
             ctx.fillStyle = '#D32F2F'; ctx.fillRect(o.x, o.y + 10, 80, 40);
@@ -281,16 +235,13 @@ function draw() {
             ctx.beginPath(); ctx.arc(o.x+65, o.y+50, 10, 0, Math.PI*2); ctx.fill();
         } else { ctx.font = '40px Arial'; ctx.fillText('🍌', o.x + 20, o.y + 35); }
     });
-    
     coins.forEach(c => { 
         if(c.type === 'red') {
             ctx.font = '45px Arial'; ctx.shadowBlur = 10; ctx.shadowColor = "red";
             ctx.fillText('🔴', c.x, c.y + 25); ctx.shadowBlur = 0;
         } else { ctx.font = '38px Arial'; ctx.fillText('🪙', c.x, c.y + 25); }
     });
-
-    update();
-    requestAnimationFrame(draw);
+    update(); requestAnimationFrame(draw);
 }
 draw();
 </script>
