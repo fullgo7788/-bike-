@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>蟻人英雄：水平校準版</title>
+    <title>蟻人英雄：十全魔王版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -11,7 +11,7 @@
         #ui { 
             position: absolute; top: 0; left: 0; width: 100%; 
             display: flex; justify-content: space-around; align-items: center; 
-            padding: 10px 0; background: rgba(255, 255, 255, 0.2);
+            padding: 10px 0; background: rgba(255, 255, 255, 0.3);
             backdrop-filter: blur(5px); color: #000; font-weight: 900; 
             font-size: 16px; text-shadow: 1px 1px 0 #fff; z-index: 100; pointer-events: none; 
         }
@@ -20,13 +20,13 @@
             width: 280px; height: 18px; background: rgba(0,0,0,0.5); border: 2px solid #fff;
             display: none; border-radius: 10px; overflow: hidden; z-index: 110;
         }
-        #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #b71c1c); transition: width 0.1s; }
+        #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #7f0000); transition: width 0.1s; }
         #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
-        .action-btn { width: 60px; height: 60px; background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 28px; color: #fff; backdrop-filter: blur(5px); }
-        #leftBtn { width: 90px; height: 90px; font-size: 45px; }
-        #fireBtn.active { background: rgba(211, 47, 47, 0.9); box-shadow: 0 0 20px #ff0000; }
+        .action-btn { width: 70px; height: 70px; background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 32px; color: #fff; backdrop-filter: blur(5px); }
+        #leftBtn { width: 100px; height: 100px; font-size: 50px; }
+        #fireBtn.active { background: rgba(211, 47, 47, 0.9); box-shadow: 0 0 20px #ff0000; border-color: #ffeb3b; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         .btn { padding: 20px 50px; background: #FFD600; border-radius: 50px; font-weight: bold; font-size: 28px; border: none; box-shadow: 0 6px 0 #A68B00; cursor: pointer; }
     </style>
@@ -36,7 +36,7 @@
 <div id="ui">
     <div class="stat-item">LV: <span id="levelText">1</span></div>
     <div class="stat-item">LIFE: <span id="livesText">👤👤👤</span></div>
-    <div class="stat-item">HP: <span id="hpText" style="color: #e91e63;">❤️❤️❤️❤️❤️</span></div>
+    <div class="stat-item">HP: <span id="hpText" style="color: #ff1744;">❤️❤️❤️❤️❤️</span></div>
     <div class="stat-item">SCORE: <span id="score">0</span> / 2000</div>
 </div>
 
@@ -54,7 +54,7 @@
 <div id="overlay">
     <div style="background:#fff; padding:40px; border-radius:30px; text-align:center; border: 5px solid #000;">
         <h2 id="endStatus" style="display:none; margin-bottom:20px;">GAME OVER</h2>
-        <button class="btn" id="startBtn">START</button>
+        <button class="btn" id="startBtn">START GAME</button>
     </div>
 </div>
 
@@ -66,15 +66,29 @@ const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score'), hpEl = document.getElementById('hpText'), livesEl = document.getElementById('livesText'), levelEl = document.getElementById('levelText'), powerUi = document.getElementById('power-ui'), timerEl = document.getElementById('timer'), bossUi = document.getElementById('boss-ui'), bossHpBar = document.getElementById('boss-hp'), overlay = document.getElementById('overlay'), startBtn = document.getElementById('startBtn'), fireBtn = document.getElementById('fireBtn');
 
 let gameState = 'START', score = 0, hp = 5, lives = 3, level = 1, speedOffset = 0, invincibleFrame = 0, currentSpeed = 0;
-let boss = { active: false, x: 0, y: 0, hp: 100, maxHp: 100, shootTimer: 0 };
 const ROAD_Y_RATIO = 0.85;
 
-// 【精確比例參數】
-const PLAYER_SIZE = 35;  
-const CAR_SIZE = 100;     
-const BOSS_SIZE = 250;   
+// 魔王資料庫
+const BOSS_DATA = [
+    { name: "MEGA TRUCK", emoji: "🚚", weapon: "💨", hpMult: 1 },
+    { name: "HELL HOUND", emoji: "🐕", weapon: "🦴", hpMult: 1.2 },
+    { name: "KONG KING", emoji: "🦍", weapon: "🍌", hpMult: 1.4 },
+    { name: "ROBO CLEANER", emoji: "🧹", weapon: "⚡", hpMult: 1.6 },
+    { name: "LAWN MOWER", emoji: "🚜", weapon: "🌱", hpMult: 1.8 },
+    { name: "FAT CAT", emoji: "🐈", weapon: "🧶", hpMult: 2.0 },
+    { name: "TOY DRAGON", emoji: "🐲", weapon: "🔥", hpMult: 2.2 },
+    { name: "POLICE CAR", emoji: "🚓", weapon: "⚠️", hpMult: 2.4 },
+    { name: "HUMIDIFIER", emoji: "🌫️", weapon: "💧", hpMult: 2.6 },
+    { name: "BIG FOOT", emoji: "👣", weapon: "💥", hpMult: 3.0 }
+];
 
-let player = { x: 100, y: 0, vy: 0, jumped: false, powerTime: 0 };
+let boss = { active: false, x: 0, y: 0, hp: 100, maxHp: 100, shootTimer: 0, type: null };
+
+const PLAYER_SIZE = 35;  
+const CAR_SIZE = 110;    
+const BOSS_SIZE = 260;   
+
+let player = { x: 120, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
 let audioCtx = null;
@@ -97,8 +111,8 @@ startBtn.onclick = () => {
 };
 
 function updateUI() {
-    hpEl.innerText = "❤️".repeat(hp);
-    livesEl.innerText = "👤".repeat(lives);
+    hpEl.innerText = "❤️".repeat(Math.max(0, hp));
+    livesEl.innerText = "👤".repeat(Math.max(0, lives));
     levelEl.innerText = level;
     scoreEl.innerText = score;
 }
@@ -108,19 +122,23 @@ canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 function update() {
     if (gameState !== 'PLAYING') return;
-
     let groundY = canvas.height * ROAD_Y_RATIO;
 
+    // Boss 登場邏輯 (依等級更換魔王)
     if (!boss.active && score >= 2000) {
         boss.active = true;
-        boss.hp = 120 + (level * 60); boss.maxHp = boss.hp;
-        boss.x = canvas.width + 150; boss.y = groundY - BOSS_SIZE;
+        let dataIndex = (level - 1) % BOSS_DATA.length;
+        boss.type = BOSS_DATA[dataIndex];
+        boss.hp = (100 + (level * 50)) * boss.type.hpMult; 
+        boss.maxHp = boss.hp;
+        boss.x = canvas.width + 150; 
+        boss.y = groundY - BOSS_SIZE;
         bossUi.style.display = 'block';
         obstacles = []; coins = [];
-        playSound(80, 1.2, 0.4, 'sawtooth');
+        playSound(60, 1.5, 0.4, 'sawtooth');
     }
 
-    currentSpeed = isPressingGo ? Math.min(6 + speedOffset, currentSpeed + 0.15) : Math.max(0, currentSpeed - 0.05);
+    currentSpeed = isPressingGo ? Math.min(6.5 + speedOffset, currentSpeed + 0.15) : Math.max(0, currentSpeed - 0.08);
     bgX = (bgX - currentSpeed) % canvas.width;
     
     player.vy += 0.55; player.y += player.vy;
@@ -134,77 +152,82 @@ function update() {
     if (invincibleFrame > 0) invincibleFrame--;
 
     if (boss.active) {
-        boss.x = Math.max(canvas.width - 250, boss.x - 2);
-        // 魔王跳動效果保持在地面基準
-        let bossFloating = Math.abs(Math.sin(Date.now() / 250) * 30);
-        boss.y = groundY - BOSS_SIZE - bossFloating; 
+        boss.x = Math.max(canvas.width - 280, boss.x - 2);
+        let bossJump = Math.abs(Math.sin(Date.now() / 200) * 40);
+        boss.y = groundY - BOSS_SIZE - bossJump; 
         
         boss.shootTimer++;
-        if (boss.shootTimer > 55 - level) {
-            obstacles.push({ x: boss.x + 50, y: groundY - 50, type: 'banana', speed: 8.5 + speedOffset });
+        if (boss.shootTimer > 45 - level) {
+            obstacles.push({ x: boss.x + 50, y: groundY - 50, type: 'boss_weapon', weapon: boss.type.weapon, speed: 9.5 + speedOffset });
             boss.shootTimer = 0;
-            playSound(150, 0.2, 0.1);
+            playSound(180, 0.2, 0.1);
         }
         bossHpBar.style.width = (boss.hp / boss.maxHp * 100) + '%';
-        if (player.powerTime < 5 && Math.random() < 0.015) coins.push({ x: canvas.width + 50, y: groundY - 100, type: 'red' });
+        if (player.powerTime < 5 && Math.random() < 0.02) coins.push({ x: canvas.width + 50, y: groundY - 120, type: 'red' });
     } else {
         distanceCounter += currentSpeed;
         if (distanceCounter > 350) {
             for(let i=0; i<3; i++) coins.push({ x: canvas.width + 50 + i*40, y: groundY - 80, type: 'gold' });
-            if(Math.random() < 0.2) coins.push({ x: canvas.width + 100, y: groundY - 150, type: Math.random() < 0.4 ? 'heart' : 'red' });
+            if(Math.random() < 0.25) coins.push({ x: canvas.width + 100, y: groundY - 160, type: Math.random() < 0.4 ? 'heart' : 'red' });
             obstacles.push({ x: canvas.width + 200, y: groundY - CAR_SIZE, type: 'car', speed: currentSpeed + 1.2 });
             distanceCounter = 0;
         }
     }
 
-    // 火球碰撞
+    // 火球碰撞偵測
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
         let b = bullets[bi]; b.x += 16;
-        if (boss.active && Math.abs(b.x - (boss.x + BOSS_SIZE/2)) < 80 && Math.abs(b.y - (boss.y + BOSS_SIZE/2)) < 100) {
+        if (boss.active && Math.abs(b.x - (boss.x + BOSS_SIZE/3)) < 120 && Math.abs(b.y - (boss.y + BOSS_SIZE/2)) < 140) {
             boss.hp -= 10; bullets.splice(bi, 1);
-            playSound(300, 0.1, 0.1, 'square');
+            playSound(400, 0.1, 0.1, 'square');
             if (boss.hp <= 0) {
                 boss.active = false; bossUi.style.display = 'none';
-                score = 0; level++; lives++; speedOffset += 0.4; updateUI(); 
-                playSound(1200, 1.0, 0.3);
+                score = 0; level++; lives++; speedOffset += 0.5; updateUI(); 
+                playSound(1000, 1.2, 0.4);
             }
             continue;
         }
         for (let oi = obstacles.length - 1; oi >= 0; oi--) {
             let o = obstacles[oi];
-            let oH = o.type === 'car' ? CAR_SIZE : 50;
-            if (Math.abs(b.x - o.x) < 50 && Math.abs(b.y - (o.y + oH/2)) < 50) {
+            let oH = (o.type === 'car') ? CAR_SIZE : 60;
+            if (Math.abs(b.x - o.x) < 60 && Math.abs(b.y - (o.y + oH/2)) < 60) {
                 obstacles.splice(oi, 1); bullets.splice(bi, 1);
-                score += 50; updateUI(); playSound(100, 0.2, 0.1, 'sawtooth');
+                score += 50; updateUI(); playSound(120, 0.2, 0.1, 'sawtooth');
                 break;
             }
         }
     }
 
-    // 碰撞判定
+    // 碰撞偵測 (包含 2 倍損傷)
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let o = obstacles[i];
         o.x -= (boss.active ? o.speed : currentSpeed + 2);
-        let oW = o.type === 'car' ? CAR_SIZE : 40;
-        let oH = o.type === 'car' ? CAR_SIZE : 40;
+        let oW = (o.type === 'car') ? CAR_SIZE : 60;
+        let oH = (o.type === 'car') ? CAR_SIZE : 60;
         
         if (invincibleFrame === 0 && 
-            Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/3) && 
-            Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/3)) {
-            hp--; invincibleFrame = 80; playSound(60, 0.4, 0.2, 'sawtooth');
+            Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/4) && 
+            Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/4)) {
+            
+            // 魔王武器扣 2 格血
+            if (o.type === 'boss_weapon') hp -= 2; 
+            else hp -= 1;
+
+            invincibleFrame = 90;
+            playSound(50, 0.5, 0.3, 'sawtooth');
             if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; document.getElementById('endStatus').style.display='block'; overlay.style.display = 'flex'; } }
             updateUI();
         }
-        if (o.x < -200) obstacles.splice(i, 1);
+        if (o.x < -300) obstacles.splice(i, 1);
     }
 
     for (let i = coins.length - 1; i >= 0; i--) {
         let c = coins[i]; c.x -= currentSpeed;
-        if (Math.abs((player.x + PLAYER_SIZE/2) - c.x) < 40 && Math.abs((player.y + PLAYER_SIZE/2) - c.y) < 40) {
+        if (Math.abs((player.x + PLAYER_SIZE/2) - c.x) < 45 && Math.abs((player.y + PLAYER_SIZE/2) - c.y) < 45) {
             if (c.type === 'heart') hp = Math.min(5, hp + 1);
             else if (c.type === 'red') player.powerTime = 15;
             else score += 10;
-            coins.splice(i, 1); updateUI(); playSound(1000, 0.08, 0.05);
+            coins.splice(i, 1); updateUI(); playSound(1100, 0.08, 0.05);
         }
         if (c.x < -100) coins.splice(i, 1);
     }
@@ -212,48 +235,48 @@ function update() {
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     let groundY = canvas.height * ROAD_Y_RATIO;
     
-    // 背景山脈
+    ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#1b5e20';
     for(let i=0; i<2; i++) {
         let x = (bgX * 0.3) % canvas.width + i * canvas.width;
-        ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x + canvas.width/2, 300); ctx.lineTo(x + canvas.width, groundY); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x + canvas.width/2, 350); ctx.lineTo(x + canvas.width, groundY); ctx.fill();
     }
     
-    // 馬路
-    ctx.fillStyle = '#222'; ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
-    ctx.strokeStyle = '#fff'; ctx.setLineDash([20, 20]);
-    ctx.beginPath(); ctx.moveTo(0, groundY + 40); ctx.lineTo(canvas.width, groundY + 40); ctx.stroke();
+    ctx.fillStyle = '#333'; ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.setLineDash([30, 30]);
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, groundY + 50); ctx.lineTo(canvas.width, groundY + 50); ctx.stroke();
     ctx.setLineDash([]);
 
-    // 繪製微型英雄 (腳踩地面)
-    if (invincibleFrame % 8 < 4) {
+    if (invincibleFrame % 10 < 5) {
         ctx.font = PLAYER_SIZE + 'px Arial'; ctx.save();
         ctx.translate(player.x + PLAYER_SIZE/2, player.y + PLAYER_SIZE/2);
-        if (player.powerTime > 0) { ctx.shadowBlur = 10; ctx.shadowColor = "red"; }
+        if (player.powerTime > 0) { ctx.shadowBlur = 15; ctx.shadowColor = "#ff0000"; }
         ctx.scale(-1, 1); ctx.fillText('🚴', 0, 0); ctx.restore(); ctx.shadowBlur = 0;
     }
     
-    // 繪製巨型魔王 (腳踩地面)
     if (boss.active) {
         ctx.font = BOSS_SIZE + 'px Arial'; ctx.textAlign = "left";
-        ctx.fillText('🐒', boss.x, boss.y + BOSS_SIZE - 20); 
+        ctx.fillText(boss.type.emoji, boss.x, boss.y + BOSS_SIZE - 20); 
+        ctx.font = '900 24px sans-serif'; ctx.fillStyle = "white"; ctx.textAlign = "center";
+        ctx.fillText(boss.type.name, boss.x + BOSS_SIZE/2, boss.y - 10);
     }
 
     ctx.textAlign = 'center';
-    bullets.forEach(b => { ctx.font = '30px Arial'; ctx.fillText('🔥', b.x, b.y); });
+    bullets.forEach(b => { ctx.font = '35px Arial'; ctx.fillText('🔥', b.x, b.y); });
     
-    // 繪製物件
     obstacles.forEach(o => { 
-        let s = o.type === 'car' ? CAR_SIZE : 50;
+        let isWeapon = o.type === 'boss_weapon';
+        let s = isWeapon ? 70 : CAR_SIZE;
         ctx.font = s + 'px Arial'; 
-        ctx.fillText(o.type === 'car' ? '🚗' : '🍌', o.x + s/2, o.y + s - 10); 
+        ctx.fillText(isWeapon ? o.weapon : '🚗', o.x + s/2, o.y + s - 10); 
     });
     
-    coins.forEach(c => { ctx.font = '30px Arial'; ctx.fillText(c.type==='heart'?'💖':(c.type==='red'?'🔴':'🪙'), c.x, c.y); });
+    coins.forEach(c => { 
+        ctx.font = '35px Arial'; 
+        ctx.fillText(c.type==='heart'?'💖':(c.type==='red'?'🔴':'🪙'), c.x, c.y); 
+    });
 
     update(); requestAnimationFrame(draw);
 }
@@ -261,10 +284,13 @@ function draw() {
 document.getElementById('leftBtn').ontouchstart = (e) => { e.preventDefault(); isPressingGo = true; initAudio(); };
 document.getElementById('leftBtn').ontouchend = () => isPressingGo = false;
 document.getElementById('jumpBtn').ontouchstart = (e) => { 
-    e.preventDefault(); if (!player.jumped && gameState === 'PLAYING') { player.vy = -14; player.jumped = true; playSound(800, 0.1, 0.05); }
+    e.preventDefault(); if (!player.jumped && gameState === 'PLAYING') { player.vy = -14.5; player.jumped = true; playSound(850, 0.1, 0.05); }
 };
 document.getElementById('fireBtn').ontouchstart = (e) => { 
-    e.preventDefault(); if (player.powerTime > 0 && gameState === 'PLAYING') { bullets.push({ x: player.x + 30, y: player.y + 15 }); playSound(500, 0.1, 0.1, 'square'); }
+    e.preventDefault(); if (player.powerTime > 0 && gameState === 'PLAYING') { 
+        bullets.push({ x: player.x + 30, y: player.y + 15 }); 
+        playSound(550, 0.1, 0.1, 'square'); 
+    }
 };
 
 draw();
