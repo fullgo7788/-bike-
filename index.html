@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>蟻人英雄：十全魔王位移版</title>
+    <title>蟻人英雄：精簡操作版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -22,10 +22,18 @@
         }
         #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #7f0000); transition: width 0.1s; }
         #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
+        
+        /* 控制區樣式 */
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
-        .action-btn { width: 70px; height: 70px; background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 32px; color: #fff; backdrop-filter: blur(5px); }
-        #leftBtn { width: 100px; height: 100px; font-size: 50px; }
+        .action-btn { background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #fff; backdrop-filter: blur(5px); }
+        
+        /* 【左側前進鍵縮小一半】 */
+        #leftBtn { width: 50px; height: 50px; font-size: 25px; } 
+        
+        /* 右側按鍵維持原樣 */
+        #fireBtn, #jumpBtn { width: 70px; height: 70px; font-size: 32px; }
+        
         #fireBtn.active { background: rgba(211, 47, 47, 0.9); box-shadow: 0 0 20px #ff0000; border-color: #ffeb3b; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         .btn { padding: 20px 50px; background: #FFD600; border-radius: 50px; font-weight: bold; font-size: 28px; border: none; box-shadow: 0 6px 0 #A68B00; cursor: pointer; }
@@ -82,12 +90,10 @@ const BOSS_DATA = [
 ];
 
 let boss = { active: false, x: 0, y: 0, hp: 100, maxHp: 100, shootTimer: 0, type: null };
-
 const PLAYER_SIZE = 35;  
 const CAR_SIZE = 110;    
 const BOSS_SIZE = 260;   
 
-// 【人物初始位置已向右移動】
 let player = { x: 150, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
@@ -130,8 +136,7 @@ function update() {
         boss.type = BOSS_DATA[dataIndex];
         boss.hp = (100 + (level * 50)) * boss.type.hpMult; 
         boss.maxHp = boss.hp;
-        boss.x = canvas.width + 150; 
-        boss.y = groundY - BOSS_SIZE;
+        boss.x = canvas.width + 150; boss.y = groundY - BOSS_SIZE;
         bossUi.style.display = 'block';
         obstacles = []; coins = [];
         playSound(60, 1.5, 0.4, 'sawtooth');
@@ -154,7 +159,6 @@ function update() {
         boss.x = Math.max(canvas.width - 280, boss.x - 2);
         let bossJump = Math.abs(Math.sin(Date.now() / 200) * 40);
         boss.y = groundY - BOSS_SIZE - bossJump; 
-        
         boss.shootTimer++;
         if (boss.shootTimer > 45 - level) {
             obstacles.push({ x: boss.x + 50, y: groundY - 50, type: 'boss_weapon', weapon: boss.type.weapon, speed: 9.5 + speedOffset });
@@ -205,10 +209,7 @@ function update() {
         if (invincibleFrame === 0 && 
             Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/4) && 
             Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/4)) {
-            
-            if (o.type === 'boss_weapon') hp -= 2; 
-            else hp -= 1;
-
+            if (o.type === 'boss_weapon') hp -= 2; else hp -= 1;
             invincibleFrame = 90;
             playSound(50, 0.5, 0.3, 'sawtooth');
             if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; document.getElementById('endStatus').style.display='block'; overlay.style.display = 'flex'; } }
