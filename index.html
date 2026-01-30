@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄：魔王鎖定版</title>
+    <title>輪胎英雄：魔王決戰版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -17,18 +17,18 @@
         }
         #boss-ui { 
             position: absolute; top: 55px; left: 50%; transform: translateX(-50%);
-            width: 250px; height: 12px; background: rgba(0,0,0,0.5); border: 2px solid #fff;
+            width: 250px; height: 15px; background: rgba(0,0,0,0.5); border: 2px solid #fff;
             display: none; border-radius: 10px; overflow: hidden; z-index: 110;
         }
-        #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff5252, #b71c1c); transition: width 0.1s; }
+        #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff8a80); transition: width 0.1s; }
         #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
-        .action-btn { width: 55px; height: 55px; background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 26px; color: #fff; backdrop-filter: blur(5px); }
-        #leftBtn { width: 90px; height: 90px; font-size: 45px; border-width: 4px; }
-        #fireBtn.active { background: rgba(211, 47, 47, 0.9); box-shadow: 0 0 15px #ff0000; border-color: #ff8a80; }
+        .action-btn { width: 60px; height: 60px; background: rgba(0,0,0,0.7); border: 3px solid #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 28px; color: #fff; backdrop-filter: blur(5px); }
+        #leftBtn { width: 90px; height: 90px; font-size: 45px; }
+        #fireBtn.active { background: rgba(211, 47, 47, 0.9); box-shadow: 0 0 20px #ff0000; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
-        .btn { padding: 18px 45px; background: #FFD600; border-radius: 50px; font-weight: bold; font-size: 24px; border: none; box-shadow: 0 6px 0 #A68B00; cursor: pointer; }
+        .btn { padding: 20px 50px; background: #FFD600; border-radius: 50px; font-weight: bold; font-size: 28px; border: none; box-shadow: 0 6px 0 #A68B00; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -53,8 +53,8 @@
 
 <div id="overlay">
     <div style="background:#fff; padding:40px; border-radius:30px; text-align:center; border: 5px solid #000;">
-        <h2 id="endStatus" style="display:none; margin:0 0 20px 0; font-size: 32px;">GAME OVER</h2>
-        <button class="btn" id="startBtn">START GAME</button>
+        <h2 id="endStatus" style="display:none; margin-bottom:20px;">GAME OVER</h2>
+        <button class="btn" id="startBtn">START</button>
     </div>
 </div>
 
@@ -66,18 +66,14 @@ const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score'), hpEl = document.getElementById('hpText'), livesEl = document.getElementById('livesText'), levelEl = document.getElementById('levelText'), powerUi = document.getElementById('power-ui'), timerEl = document.getElementById('timer'), bossUi = document.getElementById('boss-ui'), bossHpBar = document.getElementById('boss-hp'), overlay = document.getElementById('overlay'), startBtn = document.getElementById('startBtn'), fireBtn = document.getElementById('fireBtn');
 
 let gameState = 'START', score = 0, hp = 5, lives = 3, level = 1, speedOffset = 0, invincibleFrame = 0, currentSpeed = 0;
-let nextBossScore = 2000; // 核心觸發邏輯：下一次 Boss 的門檻
+let boss = { active: false, x: 0, y: 0, hp: 100, maxHp: 100, shootTimer: 0 };
 const ROAD_Y_RATIO = 0.85;
 
 let player = { x: 150, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
-// Boss 系統更新
-let boss = { active: false, x: 0, y: 0, hp: 100, maxHp: 100, shootTimer: 0 };
-
-let audioCtx = null, musicTimer = null, melodyStep = 0;
-const MELODIES = [[262, 330, 392, 523], [293, 349, 440, 587], [164, 174, 164, 155]]; 
-
+// 音效系統
+let audioCtx = null;
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 function playSound(f, d, v, t='sine') {
     if(!audioCtx) return;
@@ -89,21 +85,11 @@ function playSound(f, d, v, t='sine') {
     o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-function loopBGM() {
-    if (gameState !== 'PLAYING') return;
-    let mIdx = boss.active ? 2 : (level - 1) % 2;
-    let freq = MELODIES[mIdx][melodyStep % MELODIES[mIdx].length];
-    playSound(freq, 0.2, 0.05, boss.active ? 'sawtooth' : 'triangle');
-    melodyStep++;
-    musicTimer = setTimeout(loopBGM, boss.active ? 180 : 300);
-}
-
 startBtn.onclick = () => {
-    initAudio(); score = 0; hp = 5; lives = 3; level = 1; speedOffset = 0; nextBossScore = 2000;
+    initAudio(); score = 0; hp = 5; lives = 3; level = 1; speedOffset = 0;
     boss.active = false; bossUi.style.display = 'none';
     obstacles = []; coins = []; bullets = []; gameState = 'PLAYING';
     overlay.style.display = 'none'; updateUI(); 
-    clearTimeout(musicTimer); loopBGM();
 };
 
 function updateUI() {
@@ -118,7 +104,17 @@ canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 function update() {
     if (gameState !== 'PLAYING') return;
-    
+
+    // Boss 觸發檢查
+    if (!boss.active && score >= 2000) {
+        boss.active = true;
+        boss.hp = 100 + (level * 50); boss.maxHp = boss.hp;
+        boss.x = canvas.width + 100; boss.y = canvas.height * ROAD_Y_RATIO - 100;
+        bossUi.style.display = 'block';
+        obstacles = []; // 清空場景
+        playSound(100, 0.8, 0.3, 'sawtooth');
+    }
+
     currentSpeed = isPressingGo ? Math.min(6.5 + speedOffset, currentSpeed + 0.15) : Math.max(0, currentSpeed - 0.05);
     bgX = (bgX - currentSpeed) % canvas.width;
     
@@ -134,61 +130,49 @@ function update() {
     }
     if (invincibleFrame > 0) invincibleFrame--;
 
-    // 【核心觸發】：只要分數大於等於門檻且 Boss 尚未啟動
-    if (!boss.active && score >= nextBossScore) {
-        boss.active = true;
-        boss.hp = 100 + (level * 50); boss.maxHp = boss.hp;
-        boss.x = canvas.width + 100; boss.y = groundY - 50;
-        bossUi.style.display = 'block';
-        playSound(100, 0.8, 0.3, 'sawtooth');
-        obstacles = []; // 清理戰場
-    }
-
     if (boss.active) {
-        boss.x = Math.max(canvas.width - 120, boss.x - 2.5);
-        boss.y = (canvas.height * ROAD_Y_RATIO - 120) + Math.sin(Date.now() / 250) * 40;
-        
+        boss.x = Math.max(canvas.width - 150, boss.x - 3);
+        boss.y = (canvas.height * ROAD_Y_RATIO - 150) + Math.sin(Date.now() / 250) * 50;
         boss.shootTimer++;
-        if (boss.shootTimer > 70 - (level * 3)) {
-            obstacles.push({ x: boss.x - 20, y: boss.y + 30, type: 'banana', speed: 7 + speedOffset });
+        if (boss.shootTimer > 60 - level) {
+            obstacles.push({ x: boss.x - 20, y: boss.y + 40, type: 'banana', speed: 8 + speedOffset });
             boss.shootTimer = 0;
             playSound(200, 0.2, 0.1, 'sine');
         }
         bossHpBar.style.width = (boss.hp / boss.maxHp * 100) + '%';
+        // 魔王戰期間更頻繁給紅色球
+        if (player.powerTime < 5 && Math.random() < 0.01) coins.push({ x: canvas.width + 50, y: groundY - 100, type: 'red' });
     } else {
         distanceCounter += currentSpeed;
         if (distanceCounter > 350) {
             for(let i=0; i<3; i++) coins.push({ x: canvas.width + 50 + i*45, y: groundY - 100, type: 'gold' });
-            if(Math.random() < 0.25) coins.push({ x: canvas.width + 100, y: groundY - 160, type: Math.random() < 0.4 ? 'heart' : 'red' });
+            if(Math.random() < 0.25) coins.push({ x: canvas.width + 100, y: groundY - 160, type: Math.random() < 0.3 ? 'heart' : 'red' });
             obstacles.push({ x: canvas.width + 200, y: groundY + 10, type: 'car', speed: currentSpeed + 1.5 });
             distanceCounter = 0;
         }
     }
 
+    // 子彈碰撞魔王
     bullets.forEach((b, bi) => {
-        b.x += 14;
-        if (boss.active && Math.abs(b.x - boss.x) < 70 && Math.abs(b.y - boss.y) < 90) {
-            boss.hp -= 8; bullets.splice(bi, 1);
+        b.x += 15;
+        if (boss.active && Math.abs(b.x - boss.x) < 80 && Math.abs(b.y - boss.y) < 100) {
+            boss.hp -= 10; bullets.splice(bi, 1);
             playSound(400, 0.1, 0.1, 'square');
             if (boss.hp <= 0) {
-                // 戰勝魔王：重置分數並設定下一關
                 boss.active = false; bossUi.style.display = 'none';
                 score = 0; level++; lives++; speedOffset += 0.4;
-                updateUI(); playSound(1500, 0.6, 0.2, 'sine');
+                updateUI(); playSound(1500, 0.8, 0.2);
             }
         }
     });
 
+    // 碰撞與物件更新
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let o = obstacles[i];
         o.x -= (boss.active ? o.speed : currentSpeed + 2);
         if (invincibleFrame === 0 && Math.abs(player.x - o.x) < 45 && Math.abs(player.y - o.y) < 45) {
-            hp--; invincibleFrame = 80;
-            playSound(80, 0.3, 0.2, 'sawtooth');
-            if (hp <= 0) { 
-                lives--; hp = 5; 
-                if (lives <= 0) { gameState = 'OVER'; document.getElementById('endStatus').style.display='block'; overlay.style.display = 'flex'; } 
-            }
+            hp--; invincibleFrame = 80; playSound(80, 0.3, 0.2, 'sawtooth');
+            if (hp <= 0) { lives--; hp = 5; if (lives <= 0) { gameState = 'OVER'; document.getElementById('endStatus').style.display='block'; overlay.style.display = 'flex'; } }
             updateUI();
         }
         if (o.x < -100) obstacles.splice(i, 1);
@@ -210,6 +194,7 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // 背景山脈
     ctx.fillStyle = '#228B22';
     for(let i=0; i<2; i++) {
         let x = (bgX * 0.35) % canvas.width + i * canvas.width;
@@ -225,11 +210,12 @@ function draw() {
     }
     
     if (boss.active) {
-        ctx.font = '90px Arial'; ctx.fillText('🐒', boss.x - 45, boss.y + 45);
+        ctx.font = '95px Arial'; ctx.fillText('🐒', boss.x - 45, boss.y + 45);
         ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = "white"; ctx.textAlign = "center";
         ctx.fillText("MONKEY KING", boss.x, boss.y - 20);
     }
 
+    ctx.textAlign = 'center';
     bullets.forEach(b => { ctx.font = '35px Arial'; ctx.fillText('🔥', b.x, b.y); });
     obstacles.forEach(o => { ctx.font = '45px Arial'; ctx.fillText(o.type === 'banana' ? '🍌' : '🚗', o.x, o.y + 35); });
     coins.forEach(c => { 
