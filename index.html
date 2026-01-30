@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>蟻人英雄：十全魔王版</title>
+    <title>蟻人英雄：十全魔王位移版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -68,7 +68,6 @@ const scoreEl = document.getElementById('score'), hpEl = document.getElementById
 let gameState = 'START', score = 0, hp = 5, lives = 3, level = 1, speedOffset = 0, invincibleFrame = 0, currentSpeed = 0;
 const ROAD_Y_RATIO = 0.85;
 
-// 魔王資料庫
 const BOSS_DATA = [
     { name: "MEGA TRUCK", emoji: "🚚", weapon: "💨", hpMult: 1 },
     { name: "HELL HOUND", emoji: "🐕", weapon: "🦴", hpMult: 1.2 },
@@ -88,7 +87,8 @@ const PLAYER_SIZE = 35;
 const CAR_SIZE = 110;    
 const BOSS_SIZE = 260;   
 
-let player = { x: 120, y: 0, vy: 0, jumped: false, powerTime: 0 };
+// 【人物初始位置已向右移動】
+let player = { x: 150, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
 let audioCtx = null;
@@ -124,7 +124,6 @@ function update() {
     if (gameState !== 'PLAYING') return;
     let groundY = canvas.height * ROAD_Y_RATIO;
 
-    // Boss 登場邏輯 (依等級更換魔王)
     if (!boss.active && score >= 2000) {
         boss.active = true;
         let dataIndex = (level - 1) % BOSS_DATA.length;
@@ -174,7 +173,6 @@ function update() {
         }
     }
 
-    // 火球碰撞偵測
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
         let b = bullets[bi]; b.x += 16;
         if (boss.active && Math.abs(b.x - (boss.x + BOSS_SIZE/3)) < 120 && Math.abs(b.y - (boss.y + BOSS_SIZE/2)) < 140) {
@@ -198,7 +196,6 @@ function update() {
         }
     }
 
-    // 碰撞偵測 (包含 2 倍損傷)
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let o = obstacles[i];
         o.x -= (boss.active ? o.speed : currentSpeed + 2);
@@ -209,7 +206,6 @@ function update() {
             Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/4) && 
             Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/4)) {
             
-            // 魔王武器扣 2 格血
             if (o.type === 'boss_weapon') hp -= 2; 
             else hp -= 1;
 
@@ -236,14 +232,12 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     let groundY = canvas.height * ROAD_Y_RATIO;
-    
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#1b5e20';
     for(let i=0; i<2; i++) {
         let x = (bgX * 0.3) % canvas.width + i * canvas.width;
         ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x + canvas.width/2, 350); ctx.lineTo(x + canvas.width, groundY); ctx.fill();
     }
-    
     ctx.fillStyle = '#333'; ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
     ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.setLineDash([30, 30]);
     ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, groundY + 50); ctx.lineTo(canvas.width, groundY + 50); ctx.stroke();
@@ -265,19 +259,13 @@ function draw() {
 
     ctx.textAlign = 'center';
     bullets.forEach(b => { ctx.font = '35px Arial'; ctx.fillText('🔥', b.x, b.y); });
-    
     obstacles.forEach(o => { 
         let isWeapon = o.type === 'boss_weapon';
         let s = isWeapon ? 70 : CAR_SIZE;
         ctx.font = s + 'px Arial'; 
         ctx.fillText(isWeapon ? o.weapon : '🚗', o.x + s/2, o.y + s - 10); 
     });
-    
-    coins.forEach(c => { 
-        ctx.font = '35px Arial'; 
-        ctx.fillText(c.type==='heart'?'💖':(c.type==='red'?'🔴':'🪙'), c.x, c.y); 
-    });
-
+    coins.forEach(c => { ctx.font = '35px Arial'; ctx.fillText(c.type==='heart'?'💖':(c.type==='red'?'🔴':'🪙'), c.x, c.y); });
     update(); requestAnimationFrame(draw);
 }
 
