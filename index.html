@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>蟻人英雄：十全魔王修正版</title>
+    <title>蟻人英雄：魔王狂暴版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -22,21 +22,11 @@
         }
         #boss-hp { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0000, #7f0000); transition: width 0.1s; }
         #power-ui { position: absolute; top: 50px; right: 20px; color: #ff0000; font-weight: 900; font-size: 24px; text-shadow: 1px 1px 5px #fff; z-index: 100; display: none; }
-        
         #controls { position: absolute; bottom: 25px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 35px; box-sizing: border-box; z-index: 150; align-items: flex-end; }
         .side-right { display: flex; gap: 20px; align-items: flex-end; }
-        .action-btn { 
-            background: rgba(0, 0, 0, 0.3); 
-            border: 2px solid rgba(255, 255, 255, 0.5); 
-            border-radius: 50%; 
-            display: flex; justify-content: center; align-items: center; 
-            color: rgba(255, 255, 255, 0.8); 
-            backdrop-filter: blur(2px); 
-        }
-        
+        .action-btn { background: rgba(0, 0, 0, 0.3); border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); }
         #leftBtn { width: 50px; height: 50px; font-size: 25px; } 
         #fireBtn, #jumpBtn { width: 70px; height: 70px; font-size: 32px; }
-        
         #fireBtn.active { background: rgba(211, 47, 47, 0.6); box-shadow: 0 0 15px #ff0000; border-color: #ffeb3b; }
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 200; }
         .btn { padding: 20px 50px; background: #FFD600; border-radius: 50px; font-weight: bold; font-size: 28px; border: none; box-shadow: 0 6px 0 #A68B00; cursor: pointer; }
@@ -97,12 +87,16 @@ const PLAYER_SIZE = 35;
 const CAR_SIZE = 110;    
 const BOSS_SIZE = 260;   
 
-// --- 人物位置已向右調整，避免被左側按鍵擋住 ---
 let player = { x: 280, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
 let audioCtx = null;
+let bgmTimer = 0;
+const bgmNotes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+const melody = [0, 2, 4, 0, 0, 2, 4, 0, 4, 5, 7, 4, 5, 7];
+
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
 function playSound(f, d, v, t='sine') {
     if(!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -111,6 +105,21 @@ function playSound(f, d, v, t='sine') {
     g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
     o.connect(g).connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime + d);
+}
+
+function playBGM() {
+    if (gameState !== 'PLAYING') return;
+    let step = Math.floor(Date.now() / 200) % melody.length;
+    let freq = bgmNotes[melody[step]];
+    if (boss.active) freq /= 2;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    g.gain.setValueAtTime(0.02, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.2);
 }
 
 startBtn.onclick = () => {
@@ -133,6 +142,11 @@ canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 function update() {
     if (gameState !== 'PLAYING') return;
     let groundY = canvas.height * ROAD_Y_RATIO;
+    
+    if (Math.floor(Date.now() / 200) !== bgmTimer) {
+        bgmTimer = Math.floor(Date.now() / 200);
+        playBGM();
+    }
 
     if (!boss.active && score >= 2000) {
         boss.active = true;
@@ -163,9 +177,19 @@ function update() {
         boss.x = Math.max(canvas.width - 280, boss.x - 2);
         let bossJump = Math.abs(Math.sin(Date.now() / 200) * 40);
         boss.y = groundY - BOSS_SIZE - bossJump; 
+        
         boss.shootTimer++;
-        if (boss.shootTimer > 45 - level) {
-            obstacles.push({ x: boss.x + 50, y: groundY - 50, type: 'boss_weapon', weapon: boss.type.weapon, speed: 9.5 + speedOffset });
+        // --- 核心修改：大幅加速魔王攻擊節奏 ---
+        // 初始間隔從 45 縮短到 25，且隨等級縮減的速度翻倍 (level * 2)
+        let fireRate = Math.max(10, 25 - (level * 2)); 
+        if (boss.shootTimer > fireRate) {
+            obstacles.push({ 
+                x: boss.x + 50, 
+                y: groundY - 50, 
+                type: 'boss_weapon', 
+                weapon: boss.type.weapon, 
+                speed: 11 + speedOffset // 武器速度也稍微提升
+            });
             boss.shootTimer = 0;
             playSound(180, 0.2, 0.1);
         }
@@ -181,6 +205,7 @@ function update() {
         }
     }
 
+    // 處理子彈、障礙物碰撞邏輯與原本一致...
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
         let b = bullets[bi]; b.x += 16;
         if (boss.active && Math.abs(b.x - (boss.x + BOSS_SIZE/3)) < 120 && Math.abs(b.y - (boss.y + BOSS_SIZE/2)) < 140) {
@@ -209,10 +234,7 @@ function update() {
         o.x -= (boss.active ? o.speed : currentSpeed + 2);
         let oW = (o.type === 'car') ? CAR_SIZE : 60;
         let oH = (o.type === 'car') ? CAR_SIZE : 60;
-        
-        if (invincibleFrame === 0 && 
-            Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/4) && 
-            Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/4)) {
+        if (invincibleFrame === 0 && Math.abs((player.x + PLAYER_SIZE/2) - (o.x + oW/2)) < (PLAYER_SIZE/2 + oW/4) && Math.abs((player.y + PLAYER_SIZE/2) - (o.y + oH/2)) < (PLAYER_SIZE/2 + oH/4)) {
             if (o.type === 'boss_weapon') hp -= 2; else hp -= 1;
             invincibleFrame = 90;
             playSound(50, 0.5, 0.3, 'sawtooth');
