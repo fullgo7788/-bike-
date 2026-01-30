@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>輪胎英雄：魔王決戰版</title>
+    <title>輪胎英雄：火球全擊版</title>
     <style>
         :root { height: -webkit-fill-available; }
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; height: 100vh; }
@@ -72,7 +72,6 @@ const ROAD_Y_RATIO = 0.85;
 let player = { x: 150, y: 0, vy: 0, jumped: false, powerTime: 0 };
 let obstacles = [], coins = [], bullets = [], bgX = 0, distanceCounter = 0, isPressingGo = false;
 
-// 音效系統
 let audioCtx = null;
 function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 function playSound(f, d, v, t='sine') {
@@ -105,13 +104,12 @@ canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // Boss 觸發檢查
     if (!boss.active && score >= 2000) {
         boss.active = true;
         boss.hp = 100 + (level * 50); boss.maxHp = boss.hp;
         boss.x = canvas.width + 100; boss.y = canvas.height * ROAD_Y_RATIO - 100;
         bossUi.style.display = 'block';
-        obstacles = []; // 清空場景
+        obstacles = []; coins = [];
         playSound(100, 0.8, 0.3, 'sawtooth');
     }
 
@@ -140,21 +138,23 @@ function update() {
             playSound(200, 0.2, 0.1, 'sine');
         }
         bossHpBar.style.width = (boss.hp / boss.maxHp * 100) + '%';
-        // 魔王戰期間更頻繁給紅色球
         if (player.powerTime < 5 && Math.random() < 0.01) coins.push({ x: canvas.width + 50, y: groundY - 100, type: 'red' });
     } else {
         distanceCounter += currentSpeed;
         if (distanceCounter > 350) {
             for(let i=0; i<3; i++) coins.push({ x: canvas.width + 50 + i*45, y: groundY - 100, type: 'gold' });
-            if(Math.random() < 0.25) coins.push({ x: canvas.width + 100, y: groundY - 160, type: Math.random() < 0.3 ? 'heart' : 'red' });
+            if(Math.random() < 0.25) coins.push({ x: canvas.width + 100, y: groundY - 160, type: Math.random() < 0.4 ? 'heart' : 'red' });
             obstacles.push({ x: canvas.width + 200, y: groundY + 10, type: 'car', speed: currentSpeed + 1.5 });
             distanceCounter = 0;
         }
     }
 
-    // 子彈碰撞魔王
-    bullets.forEach((b, bi) => {
+    // 火球碰撞偵測 (修正核心：現在可以打汽車了)
+    for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        let b = bullets[bi];
         b.x += 15;
+
+        // 碰撞魔王
         if (boss.active && Math.abs(b.x - boss.x) < 80 && Math.abs(b.y - boss.y) < 100) {
             boss.hp -= 10; bullets.splice(bi, 1);
             playSound(400, 0.1, 0.1, 'square');
@@ -163,10 +163,24 @@ function update() {
                 score = 0; level++; lives++; speedOffset += 0.4;
                 updateUI(); playSound(1500, 0.8, 0.2);
             }
+            continue;
         }
-    });
 
-    // 碰撞與物件更新
+        // 碰撞普通障礙物 (汽車、香蕉皮)
+        for (let oi = obstacles.length - 1; oi >= 0; oi--) {
+            let o = obstacles[oi];
+            if (Math.abs(b.x - o.x) < 55 && Math.abs(b.y - (o.y + 20)) < 55) {
+                obstacles.splice(oi, 1); // 汽車消失
+                bullets.splice(bi, 1);   // 火球消失
+                score += 50;             // 加分
+                updateUI();
+                playSound(150, 0.2, 0.1, 'sawtooth'); // 爆炸音
+                break;
+            }
+        }
+    }
+
+    // 玩家受傷判定
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let o = obstacles[i];
         o.x -= (boss.active ? o.speed : currentSpeed + 2);
@@ -193,8 +207,6 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 背景山脈
     ctx.fillStyle = '#228B22';
     for(let i=0; i<2; i++) {
         let x = (bgX * 0.35) % canvas.width + i * canvas.width;
